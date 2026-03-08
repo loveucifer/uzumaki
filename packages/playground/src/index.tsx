@@ -1,8 +1,7 @@
-import { Window  } from "usumaki"
-import { render } from "usumaki/react"
-import { App } from "./app"
+import { Window } from 'usumaki';
+import { render } from 'usumaki/react';
+import { App } from './app';
 
-const window = new Window("main", { title: "Somestupid shit" })
+const window = new Window('main', { title: 'Usumaki' });
 
-
-render(window, <App />)
+render(window, <App />);

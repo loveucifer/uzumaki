@@ -9,10 +9,12 @@
   "private": true,
   "scripts": {
     "start": "pnpm build:core && pnpm --filter playground start",
-    "build:core": "pnpm --filter usumaki build"
+    "build:core": "pnpm --filter usumaki build",
+    "format": "prettier --write ."
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "prettier": "^3.8.1"
   },
   "peerDependencies": {
     "typescript": "^5"
