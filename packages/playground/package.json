@@ -6,9 +6,11 @@
     "start": "usumaki src/index.tsx"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/react": "^19.2.14"
   },
   "dependencies": {
+    "react": "^19.2.4",
     "usumaki": "workspace:*"
   },
   "peerDependencies": {

@@ -88,7 +88,11 @@ impl Window {
         // 1. Create an Rgba8Unorm intermediate texture with STORAGE_BINDING
         let target = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("vello_target"),
-            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -123,10 +127,12 @@ impl Window {
                 }
             }
         };
-        let surface_view = surface_texture.texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(self.surface_config.format),
-            ..Default::default()
-        });
+        let surface_view = surface_texture
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor {
+                format: Some(self.surface_config.format),
+                ..Default::default()
+            });
 
         let blitter = wgpu::util::TextureBlitter::new(device, self.surface_config.format);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());

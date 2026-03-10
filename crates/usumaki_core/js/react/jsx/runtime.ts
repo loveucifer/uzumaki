@@ -16,8 +16,8 @@ export namespace JSX {
     view: {
       x?: number;
       y?: number;
-      width?: number;
-      height?: number;
+      width?: number | 'full';
+      height?: number | 'full';
       children?: any;
       flex?: boolean | 'col' | 'row';
       items?: 'start' | 'end' | 'center' | 'stretch' | 'baseline';
@@ -30,7 +30,14 @@ export namespace JSX {
       gap?: number;
     };
     text: {
-      children?: string;
+      children?: Element;
+    };
+    p: {
+      children?: Element;
+    };
+    button: {
+      children?: Element;
+      onClick?: () => void;
     };
   }
 }

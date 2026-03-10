@@ -6,6 +6,7 @@ use parking_lot::Mutex;
 use winit::{
     application::ApplicationHandler,
     event_loop::{EventLoop, EventLoopProxy},
+    platform::windows::WindowAttributesExtWindows,
     window::WindowId,
 };
 
