@@ -1,3 +1,3 @@
 [workspace]
 resolver = "2"
-members = [ "crates/usumaki_core" ]
+members = [ "crates/uzumaki_core" ]

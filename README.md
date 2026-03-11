@@ -1,4 +1,4 @@
-# usumaki
+# uzumaki
 
 To install dependencies:
 

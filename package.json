@@ -1,15 +1,15 @@
 {
-  "name": "usumaki",
+  "name": "uzumaki",
   "module": "index.ts",
   "type": "module",
   "workspaces": [
-    "crates/usumaki_core",
+    "crates/uzumaki_core",
     "packages/*"
   ],
   "private": true,
   "scripts": {
     "start": "pnpm build:core && pnpm --filter playground start",
-    "build:core": "pnpm --filter usumaki build",
+    "build:core": "pnpm --filter uzumaki build",
     "format": "prettier --write ."
   },
   "devDependencies": {

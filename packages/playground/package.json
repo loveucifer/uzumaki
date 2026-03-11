@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "usumaki src/index.tsx"
+    "start": "uzumaki src/index.tsx"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "react": "^19.2.4",
-    "usumaki": "workspace:*"
+    "uzumaki": "workspace:*"
   },
   "peerDependencies": {
     "typescript": "^5"

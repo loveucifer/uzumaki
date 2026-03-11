@@ -10,7 +10,7 @@ switch (cmd) {
   case 'run': {
     const entryPoint = process.argv[3];
     if (!entryPoint) {
-      console.error('usage: usumaki run <entry-point.ts>');
+      console.error('usage: uzumaki run <entry-point.ts>');
       process.exit(1);
     }
     await run(entryPoint);
@@ -19,7 +19,7 @@ switch (cmd) {
   case 'build': {
     const entryPoint = process.argv[3];
     if (!entryPoint) {
-      console.error('usage: usumaki build <entry-point.ts>');
+      console.error('usage: uzumaki build <entry-point.ts>');
       process.exit(1);
     }
 
@@ -31,7 +31,7 @@ switch (cmd) {
   default: {
     const entryPoint = process.argv[2];
     if (!entryPoint) {
-      console.error('usage: usumaki <entry-point.ts>');
+      console.error('usage: uzumaki <entry-point.ts>');
       process.exit(1);
     }
     await run(entryPoint);

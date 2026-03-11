@@ -17,7 +17,7 @@ export class Window {
     {
       width = 800,
       height = 600,
-      title = 'Usumaki',
+      title = 'uzumaki',
     }: Partial<WindowAttributes> = {},
   ) {
     this._width = width;
@@ -48,7 +48,7 @@ export class Window {
 
 export function runApp({
   entryFilePath,
-  title = 'Usumaki',
+  title = 'uzumaki',
 }: {
   entryFilePath: string;
   title?: string;

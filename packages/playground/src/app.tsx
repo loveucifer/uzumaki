@@ -12,7 +12,7 @@ export function App() {
       justify="center"
       p={2}
     >
-      <text>Hello Usumaki</text>
+      <text>Hello uzumaki</text>
       <p>Count: {count}</p>
       <button onClick={() => setCount(count + 1)}>Click me</button>
     </view>

@@ -10,6 +10,7 @@ use winit::{
     window::WindowId,
 };
 
+pub mod element;
 pub mod geometry;
 pub mod gpu;
 pub mod window;

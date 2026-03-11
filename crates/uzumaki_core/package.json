@@ -1,8 +1,8 @@
 {
-  "name": "usumaki",
-  "package": "usumaki",
+  "name": "uzumaki",
+  "package": "uzumaki",
   "bin": {
-    "usumaki": "./js/cli.ts"
+    "uzumaki": "./js/cli.ts"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.5.1"
@@ -14,7 +14,7 @@
     "./jsx-dev-runtime": "./js/react/jsx/runtime.ts"
   },
   "napi": {
-    "binaryName": "usumaki"
+    "binaryName": "uzumaki"
   },
   "scripts": {
     "start": "bun js/index.js",
