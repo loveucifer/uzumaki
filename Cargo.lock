@@ -451,6 +451,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
+name = "derive_refineable"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1808,6 +1817,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "refineable"
+version = "0.1.0"
+dependencies = [
+ "derive_refineable",
+]
+
+[[package]]
 name = "renderdoc-sys"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2294,6 +2310,7 @@ dependencies = [
  "napi-derive",
  "parking_lot",
  "pollster",
+ "refineable",
  "slotmap",
  "taffy",
  "vello",

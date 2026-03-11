@@ -1,3 +1,16 @@
 [workspace]
 resolver = "2"
-members = [ "crates/uzumaki_core" ]
+members = [ "crates/uzumaki_core", "crates/refineable" ]
+
+[workspace.package]
+publish = false
+edition = "2024"
+
+[workspace.dependencies]
+refineable = { path = "./crates/refineable" }
+quote = "1.0.45"
+syn = "2.0.117"
+proc-macro2 = "1.0.106"
+parking_lot = "0.12.5"
+pollster = "0.4.0"
+anyhow = "1.0.102"
