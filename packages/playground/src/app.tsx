@@ -5,8 +5,8 @@ export function App() {
 
   return (
     <view
-      height="full"
-      width="full"
+      h="full"
+      w="full"
       flex="col"
       items="center"
       justify="center"

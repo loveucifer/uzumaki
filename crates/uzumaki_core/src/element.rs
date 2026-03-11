@@ -358,17 +358,16 @@ pub fn build_demo_tree() -> Dom {
 
     let mut dom = Dom::new();
 
-    // Catppuccin Mocha palette
-    let base = Color::from_rgba8(30, 30, 46, 255);
-    let crust = Color::from_rgba8(17, 17, 27, 255);
-    let surface0 = Color::from_rgba8(49, 50, 68, 255);
-    let overlay0 = Color::from_rgba8(108, 112, 134, 255);
-    let text_color = Color::from_rgba8(205, 214, 244, 255);
-    let subtext = Color::from_rgba8(166, 173, 200, 255);
-    let blue = Color::from_rgba8(137, 180, 250, 255);
-    let green = Color::from_rgba8(166, 227, 161, 255);
-    let peach = Color::from_rgba8(250, 179, 135, 255);
-    let lavender = Color::from_rgba8(180, 190, 254, 255);
+    // VS Code Dark+ inspired palette
+    let base = Color::from_rgba8(15, 15, 15, 255); // main background
+    let panel = Color::from_rgba8(20, 20, 20, 255); // surfaces/cards
+    let border = Color::from_rgba8(60, 60, 60, 255); // subtle dividers
+    let text_color = Color::from_rgba8(212, 212, 212, 255); // primary text
+    let subtext = Color::from_rgba8(140, 140, 150, 255); // secondary text
+    let accent_blue = Color::from_rgba8(86, 156, 214, 255); // keyword blue
+    let accent_green = Color::from_rgba8(102, 204, 153, 255);
+    let accent_orange = Color::from_rgba8(206, 145, 120, 255);
+    let nav_active = Color::from_rgba8(45, 45, 48, 255); // selected item
 
     // Root
     let root = dom.create_element(Element::Root, Style {
@@ -385,8 +384,8 @@ pub fn build_demo_tree() -> Dom {
     // Header
     let header = dom.create_element(
         Element::View(ViewProps {
-            background_color: base,
-            border_color: surface0,
+            background_color: panel,
+            border_color: border,
             border_width: 1.0,
             ..Default::default()
         }),
@@ -408,7 +407,7 @@ pub fn build_demo_tree() -> Dom {
         Element::Text(TextProps {
             content: "Uzumaki".to_string(),
             font_size: 18.0,
-            color: lavender,
+            color: accent_blue,
         }),
         Style {
             size: Size {
@@ -422,19 +421,25 @@ pub fn build_demo_tree() -> Dom {
     dom.append_child(header, header_text);
 
     // Body
-    let body = dom.create_element(Element::Root, Style {
-        display: Display::Flex,
-        flex_direction: FlexDirection::Row,
-        flex_grow: 1.0,
-        ..Default::default()
-    });
+    let body = dom.create_element(
+        Element::View(ViewProps {
+            background_color: base,
+            ..Default::default()
+        }),
+        Style {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            flex_grow: 1.0,
+            ..Default::default()
+        }
+    );
     dom.append_child(root, body);
 
     // Sidebar
     let sidebar = dom.create_element(
         Element::View(ViewProps {
-            background_color: base,
-            border_color: surface0,
+            background_color: panel,
+            border_color: border,
             border_width: 1.0,
             ..Default::default()
         }),
@@ -458,7 +463,7 @@ pub fn build_demo_tree() -> Dom {
         let nav = dom.create_element(
             Element::View(ViewProps {
                 background_color: if i == 0 {
-                    surface0
+                    nav_active
                 } else {
                     Color::TRANSPARENT
                 },
@@ -543,16 +548,16 @@ pub fn build_demo_tree() -> Dom {
 
     // Three metric cards
     let cards = [
-        ("Revenue", "$12,400", blue),
-        ("Users", "1,240", green),
-        ("Growth", "+24%", peach),
+        ("Revenue", "$12,400", accent_blue),
+        ("Users", "1,240", accent_green),
+        ("Growth", "+24%", accent_orange),
     ];
     for (title, value, accent) in cards {
         let card = dom.create_element(
             Element::View(ViewProps {
-                background_color: base,
+                background_color: panel,
                 border_radius: 8.0,
-                border_color: surface0,
+                border_color: border,
                 border_width: 1.0,
             }),
             Style {
@@ -569,7 +574,7 @@ pub fn build_demo_tree() -> Dom {
         let card_title = dom.create_element(
             Element::Text(TextProps {
                 content: title.to_string(),
-                font_size: 13.0,
+                font_size: 16.0,
                 color: subtext,
             }),
             Style {
@@ -602,9 +607,9 @@ pub fn build_demo_tree() -> Dom {
     // Bottom panel
     let bottom = dom.create_element(
         Element::View(ViewProps {
-            background_color: base,
+            background_color: panel,
             border_radius: 8.0,
-            border_color: surface0,
+            border_color: border,
             border_width: 1.0,
         }),
         Style {
@@ -637,8 +642,8 @@ pub fn build_demo_tree() -> Dom {
     let panel_text = dom.create_element(
         Element::Text(TextProps {
             content: "No recent activity to display.".to_string(),
-            font_size: 13.0,
-            color: overlay0,
+            font_size: 16.0,
+            color: subtext,
         }),
         Style {
             size: Size {
@@ -653,8 +658,8 @@ pub fn build_demo_tree() -> Dom {
     // Footer
     let footer = dom.create_element(
         Element::View(ViewProps {
-            background_color: crust,
-            border_color: surface0,
+            background_color: panel,
+            border_color: border,
             border_width: 1.0,
             ..Default::default()
         }),
@@ -675,7 +680,7 @@ pub fn build_demo_tree() -> Dom {
         Element::Text(TextProps {
             content: "Uzumaki v0.1.0".to_string(),
             font_size: 16.0,
-            color: overlay0,
+            color: subtext,
         }),
         Style {
             size: Size {

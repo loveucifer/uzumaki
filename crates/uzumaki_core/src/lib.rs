@@ -1,11 +1,11 @@
 use napi::bindgen_prelude::*;
-use std::{collections::HashMap, sync::Arc};
+use std::{ collections::HashMap, sync::Arc };
 
 use napi_derive::napi;
 use parking_lot::Mutex;
 use winit::{
     application::ApplicationHandler,
-    event_loop::{EventLoop, EventLoopProxy},
+    event_loop::{ EventLoop, EventLoopProxy },
     window::WindowId,
 };
 
@@ -16,7 +16,7 @@ pub mod text;
 pub mod window;
 use window::Window;
 
-use crate::element::{build_demo_tree, Dom};
+use crate::element::{ build_demo_tree, Dom };
 use crate::gpu::GpuContext;
 use crate::text::TextRenderer;
 
@@ -101,9 +101,7 @@ impl Application {
                 self.window_label_to_id.insert(label, window.id());
                 self.windows.insert(window.id(), window);
             }
-            Err(e) => {
-                println!("Error creating window : {:#?}", e)
-            }
+            Err(e) => { println!("Error creating window : {:#?}", e) }
         }
     }
 
@@ -119,7 +117,8 @@ impl Application {
 
     #[napi]
     pub fn run(&mut self) {
-        let event_loop = EventLoop::<UserEvent>::with_user_event()
+        let event_loop = EventLoop::<UserEvent>
+            ::with_user_event()
             .build()
             .expect("Error creating event loop");
 
@@ -128,11 +127,12 @@ impl Application {
             *lock = Some(event_loop.create_proxy());
         }
 
-        ctrlc::set_handler(|| {
-            println!("SIGINT received, exiting...");
-            request_quit();
-        })
-        .expect("error setting quit handler");
+        ctrlc
+            ::set_handler(|| {
+                println!("SIGINT received, exiting...");
+                request_quit();
+            })
+            .expect("error setting quit handler");
 
         println!("Starting event loop ");
         event_loop.run_app(self).expect("Error running event loop ");
@@ -155,17 +155,16 @@ impl ApplicationHandler<UserEvent> for Application {
 
     fn user_event(&mut self, event_loop: &winit::event_loop::ActiveEventLoop, event: UserEvent) {
         match event {
-            UserEvent::CreateWindow {
-                label,
-                width,
-                height,
-                title,
-            } => {
-                let attributes = winit::window::WindowAttributes::default()
+            UserEvent::CreateWindow { label, width, height, title } => {
+                let attributes = winit::window::WindowAttributes
+                    ::default()
                     .with_title(title)
-                    .with_inner_size(winit::dpi::Size::new(winit::dpi::LogicalSize::new(
-                        width, height,
-                    )));
+                    .with_inner_size(
+                        winit::dpi::Size::new(winit::dpi::LogicalSize::new(width, height))
+                    )
+                    .with_min_inner_size(
+                        winit::dpi::Size::new(winit::dpi::LogicalSize::new(400, 300))
+                    );
 
                 println!("Creating window");
                 let Ok(winit_window) = event_loop.create_window(attributes) else {
@@ -187,7 +186,7 @@ impl ApplicationHandler<UserEvent> for Application {
         &mut self,
         event_loop: &winit::event_loop::ActiveEventLoop,
         window_id: winit::window::WindowId,
-        event: winit::event::WindowEvent,
+        event: winit::event::WindowEvent
     ) {
         use winit::event::WindowEvent;
 
@@ -201,7 +200,12 @@ impl ApplicationHandler<UserEvent> for Application {
             }
             WindowEvent::RedrawRequested => {
                 if let Some(window) = self.windows.get_mut(&window_id) {
-                    window.paint_and_present(&self.gpu.device, &self.gpu.queue, &mut self.dom, &mut self.text_renderer);
+                    window.paint_and_present(
+                        &self.gpu.device,
+                        &self.gpu.queue,
+                        &mut self.dom,
+                        &mut self.text_renderer
+                    );
                 }
             }
             WindowEvent::CloseRequested => {
