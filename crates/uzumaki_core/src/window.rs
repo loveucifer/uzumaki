@@ -89,7 +89,7 @@ impl Window {
         let height = self.surface_config.height;
 
         // Compute layout for current window size
-        dom.compute_layout(width as f32, height as f32);
+        dom.compute_layout(width as f32, height as f32, text_renderer);
 
         // Build scene from DOM
         self.scene.reset();

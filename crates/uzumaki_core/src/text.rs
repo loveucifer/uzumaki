@@ -54,6 +54,30 @@ impl TextRenderer {
         }
     }
 
+    fn layout_buffer(
+        &mut self,
+        text: &str,
+        attrs: Attrs<'_>,
+        font_size: f32,
+        width: Option<f32>,
+        height: Option<f32>,
+    ) -> Buffer {
+        let metrics = Metrics::new(font_size, (font_size * 1.2).round());
+        let mut buffer = Buffer::new(&mut self.font_system, metrics);
+        buffer.set_text(&mut self.font_system, text, &attrs, Shaping::Advanced, None);
+        buffer.set_size(&mut self.font_system, width, height);
+        buffer.shape_until_scroll(&mut self.font_system, false);
+        buffer
+    }
+
+    fn cache_fonts_from_buffer(&mut self, buffer: &Buffer) {
+        for run in buffer.layout_runs() {
+            for glyph in run.glyphs.iter() {
+                self.ensure_font_cached(glyph.font_id);
+            }
+        }
+    }
+
     pub fn draw_text(
         &mut self,
         scene: &mut Scene,
@@ -65,18 +89,8 @@ impl TextRenderer {
         position: (f32, f32),
         color: Color,
     ) {
-        let metrics = Metrics::new(font_size, (font_size * 1.2).round());
-        let mut buffer = Buffer::new(&mut self.font_system, metrics);
-        buffer.set_text(&mut self.font_system, text, &attrs, Shaping::Advanced, None);
-        buffer.set_size(&mut self.font_system, Some(width), Some(height));
-        buffer.shape_until_scroll(&mut self.font_system, false);
-
-        // First pass: cache any new fonts encountered in this layout
-        for run in buffer.layout_runs() {
-            for glyph in run.glyphs.iter() {
-                self.ensure_font_cached(glyph.font_id);
-            }
-        }
+        let buffer = self.layout_buffer(text, attrs, font_size, Some(width), Some(height));
+        self.cache_fonts_from_buffer(&buffer);
 
         // Second pass: draw glyphs, grouping consecutive runs by font_id
         let (px, py) = position;
@@ -111,5 +125,37 @@ impl TextRenderer {
                 }
             }
         }
+    }
+
+    pub fn measure_text(
+        &mut self,
+        text: &str,
+        attrs: Attrs<'_>,
+        font_size: f32,
+        max_width: Option<f32>,
+        max_height: Option<f32>,
+    ) -> (f32, f32) {
+        let buffer = self.layout_buffer(text, attrs, font_size, max_width, max_height);
+        self.cache_fonts_from_buffer(&buffer);
+
+        let mut measured_width: f32 = 0.0;
+        let mut measured_height: f32 = 0.0;
+
+        for run in buffer.layout_runs() {
+            // Use glyph extents to avoid relying on line_w when wrap width is tiny.
+            for glyph in run.glyphs.iter() {
+                measured_width = measured_width.max(glyph.x + glyph.w);
+            }
+            measured_height = measured_height.max(run.line_top + run.line_height);
+        }
+
+        if measured_height == 0.0 {
+            measured_height = buffer.metrics().line_height;
+        }
+        if measured_width == 0.0 {
+            measured_width = (text.len() as f32) * (font_size * 0.6);
+        }
+
+        (measured_width, measured_height)
     }
 }

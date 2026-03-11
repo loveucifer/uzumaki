@@ -6,7 +6,6 @@ use parking_lot::Mutex;
 use winit::{
     application::ApplicationHandler,
     event_loop::{EventLoop, EventLoopProxy},
-    platform::windows::WindowAttributesExtWindows,
     window::WindowId,
 };
 
@@ -146,7 +145,7 @@ impl Application {
 }
 
 impl ApplicationHandler<UserEvent> for Application {
-    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+    fn resumed(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
         println!("Application init");
         if let Some(cb) = self.on_init.take() {
             let _ = cb.call(());

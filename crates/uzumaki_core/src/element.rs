@@ -1,12 +1,14 @@
 use cosmic_text::Attrs;
-use slotmap::{new_key_type, SlotMap};
-use vello::kurbo::{Affine, Rect, RoundedRect, Stroke};
+use slotmap::{ new_key_type, SlotMap };
+use vello::kurbo::{ Affine, Rect, RoundedRect, Stroke };
 use vello::peniko::Color;
 use vello::Scene;
 
 use crate::text::TextRenderer;
 
-new_key_type! { pub struct NodeId; }
+new_key_type! {
+    pub struct NodeId;
+}
 
 #[derive(Clone, Debug)]
 pub struct ViewProps {
@@ -41,6 +43,12 @@ pub enum Element {
     Text(TextProps),
 }
 
+#[derive(Clone, Debug)]
+pub struct NodeContext {
+    pub dom_id: NodeId,
+    pub text: Option<TextProps>,
+}
+
 pub struct Node {
     pub parent: Option<NodeId>,
     pub first_child: Option<NodeId>,
@@ -53,7 +61,7 @@ pub struct Node {
 
 pub struct Dom {
     pub nodes: SlotMap<NodeId, Node>,
-    pub taffy: taffy::TaffyTree,
+    pub taffy: taffy::TaffyTree<NodeContext>,
     pub root: Option<NodeId>,
 }
 
@@ -67,8 +75,12 @@ impl Dom {
     }
 
     pub fn create_element(&mut self, element: Element, style: taffy::Style) -> NodeId {
+        let text_context = match &element {
+            Element::Text(props) => Some(props.clone()),
+            _ => None,
+        };
         let taffy_node = self.taffy.new_leaf(style).unwrap();
-        self.nodes.insert(Node {
+        let node_id = self.nodes.insert(Node {
             parent: None,
             first_child: None,
             last_child: None,
@@ -76,7 +88,17 @@ impl Dom {
             prev_sibling: None,
             taffy_node,
             element,
-        })
+        });
+        self.taffy
+            .set_node_context(
+                taffy_node,
+                Some(NodeContext {
+                    dom_id: node_id,
+                    text: text_context,
+                })
+            )
+            .unwrap();
+        node_id
     }
 
     pub fn set_root(&mut self, node_id: NodeId) {
@@ -114,9 +136,7 @@ impl Dom {
             .iter()
             .position(|&c| c == before_taffy)
             .expect("before node not found in parent");
-        self.taffy
-            .insert_child_at_index(parent_taffy, idx, child_taffy)
-            .unwrap();
+        self.taffy.insert_child_at_index(parent_taffy, idx, child_taffy).unwrap();
 
         // Update linked list
         let prev = self.nodes[before_id].prev_sibling;
@@ -136,9 +156,7 @@ impl Dom {
         // Sync taffy tree
         let parent_taffy = self.nodes[parent_id].taffy_node;
         let child_taffy = self.nodes[child_id].taffy_node;
-        self.taffy
-            .remove_child(parent_taffy, child_taffy)
-            .unwrap();
+        self.taffy.remove_child(parent_taffy, child_taffy).unwrap();
 
         // Update linked list
         let prev = self.nodes[child_id].prev_sibling;
@@ -161,16 +179,24 @@ impl Dom {
         self.nodes[child_id].next_sibling = None;
     }
 
-    pub fn compute_layout(&mut self, width: f32, height: f32) {
+    pub fn compute_layout(&mut self, width: f32, height: f32, text_renderer: &mut TextRenderer) {
         if let Some(root) = self.root {
             let taffy_root = self.nodes[root].taffy_node;
             self.taffy
-                .compute_layout(
+                .compute_layout_with_measure(
                     taffy_root,
                     taffy::Size {
                         width: taffy::AvailableSpace::Definite(width),
                         height: taffy::AvailableSpace::Definite(height),
                     },
+                    |known_dimensions, available_space, _node_id, node_context, _style| {
+                        Self::measure(
+                            text_renderer,
+                            known_dimensions,
+                            available_space,
+                            node_context
+                        )
+                    }
                 )
                 .unwrap();
         }
@@ -188,29 +214,31 @@ impl Dom {
         text_renderer: &mut TextRenderer,
         node_id: NodeId,
         parent_x: f64,
-        parent_y: f64,
+        parent_y: f64
     ) {
         let node = &self.nodes[node_id];
         let Ok(layout) = self.taffy.layout(node.taffy_node) else {
             return;
         };
 
-        let x = parent_x + layout.location.x as f64;
-        let y = parent_y + layout.location.y as f64;
+        let x = parent_x + (layout.location.x as f64);
+        let y = parent_y + (layout.location.y as f64);
         let w = layout.size.width as f64;
         let h = layout.size.height as f64;
 
         match &node.element {
             Element::View(props) => {
                 if props.border_radius > 0.0 {
-                    let shape =
-                        RoundedRect::from_rect(Rect::new(x, y, x + w, y + h), props.border_radius);
+                    let shape = RoundedRect::from_rect(
+                        Rect::new(x, y, x + w, y + h),
+                        props.border_radius
+                    );
                     scene.fill(
                         vello::peniko::Fill::NonZero,
                         Affine::IDENTITY,
                         props.background_color,
                         None,
-                        &shape,
+                        &shape
                     );
                     if props.border_width > 0.0 {
                         scene.stroke(
@@ -218,7 +246,7 @@ impl Dom {
                             Affine::IDENTITY,
                             props.border_color,
                             None,
-                            &shape,
+                            &shape
                         );
                     }
                 } else {
@@ -228,7 +256,7 @@ impl Dom {
                         Affine::IDENTITY,
                         props.background_color,
                         None,
-                        &shape,
+                        &shape
                     );
                     if props.border_width > 0.0 {
                         scene.stroke(
@@ -236,7 +264,7 @@ impl Dom {
                             Affine::IDENTITY,
                             props.border_color,
                             None,
-                            &shape,
+                            &shape
                         );
                     }
                 }
@@ -251,7 +279,7 @@ impl Dom {
                     w as f32,
                     h as f32,
                     (x as f32, y as f32),
-                    props.color,
+                    props.color
                 );
             }
         }
@@ -263,9 +291,49 @@ impl Dom {
             child = self.nodes[child_id].next_sibling;
         }
     }
+
+    fn measure(
+        text_renderer: &mut TextRenderer,
+        known_dimensions: taffy::Size<Option<f32>>,
+        available_space: taffy::Size<taffy::AvailableSpace>,
+        node_context: Option<&mut NodeContext>
+    ) -> taffy::Size<f32> {
+        let default_size = taffy::Size {
+            width: known_dimensions.width.unwrap_or(0.0),
+            height: known_dimensions.height.unwrap_or(0.0),
+        };
+
+        let Some(ctx) = node_context else {
+            return default_size;
+        };
+
+        if let Some(text) = &ctx.text {
+            let (measured_width, measured_height) = text_renderer.measure_text(
+                &text.content,
+                Attrs::new(),
+                text.font_size,
+                known_dimensions.width.or_else(|| available_as_option(available_space.width)),
+                known_dimensions.height.or_else(|| available_as_option(available_space.height))
+            );
+
+            return taffy::Size {
+                width: measured_width,
+                height: measured_height,
+            };
+        }
+
+        default_size
+    }
 }
 
 // Helpers for uniform taffy geometry
+fn available_as_option(space: taffy::AvailableSpace) -> Option<f32> {
+    match space {
+        taffy::AvailableSpace::Definite(v) => Some(v),
+        _ => None,
+    }
+}
+
 fn length_rect(val: f32) -> taffy::Rect<taffy::LengthPercentage> {
     let v = taffy::LengthPercentage::length(val);
     taffy::Rect {
@@ -303,18 +371,15 @@ pub fn build_demo_tree() -> Dom {
     let lavender = Color::from_rgba8(180, 190, 254, 255);
 
     // Root
-    let root = dom.create_element(
-        Element::Root,
-        Style {
-            display: Display::Flex,
-            flex_direction: FlexDirection::Column,
-            size: Size {
-                width: Dimension::percent(1.0),
-                height: Dimension::percent(1.0),
-            },
-            ..Default::default()
+    let root = dom.create_element(Element::Root, Style {
+        display: Display::Flex,
+        flex_direction: FlexDirection::Column,
+        size: Size {
+            width: Dimension::percent(1.0),
+            height: Dimension::percent(1.0),
         },
-    );
+        ..Default::default()
+    });
     dom.set_root(root);
 
     // Header
@@ -335,7 +400,7 @@ pub fn build_demo_tree() -> Dom {
             },
             padding: length_rect(16.0),
             ..Default::default()
-        },
+        }
     );
     dom.append_child(root, header);
 
@@ -347,24 +412,22 @@ pub fn build_demo_tree() -> Dom {
         }),
         Style {
             size: Size {
-                width: Dimension::length(200.0),
-                height: Dimension::length(24.0),
+                width: Dimension::auto(),
+                height: Dimension::auto(),
             },
+            flex_shrink: 0.0,
             ..Default::default()
-        },
+        }
     );
     dom.append_child(header, header_text);
 
     // Body
-    let body = dom.create_element(
-        Element::Root,
-        Style {
-            display: Display::Flex,
-            flex_direction: FlexDirection::Row,
-            flex_grow: 1.0,
-            ..Default::default()
-        },
-    );
+    let body = dom.create_element(Element::Root, Style {
+        display: Display::Flex,
+        flex_direction: FlexDirection::Row,
+        flex_grow: 1.0,
+        ..Default::default()
+    });
     dom.append_child(root, body);
 
     // Sidebar
@@ -379,13 +442,13 @@ pub fn build_demo_tree() -> Dom {
             display: Display::Flex,
             flex_direction: FlexDirection::Column,
             size: Size {
-                width: Dimension::length(200.0),
+                width: Dimension::length(400.0),
                 height: Dimension::auto(),
             },
             padding: length_rect(12.0),
             gap: length_size(4.0),
             ..Default::default()
-        },
+        }
     );
     dom.append_child(body, sidebar);
 
@@ -394,7 +457,11 @@ pub fn build_demo_tree() -> Dom {
     for (i, label) in nav_labels.iter().enumerate() {
         let nav = dom.create_element(
             Element::View(ViewProps {
-                background_color: if i == 0 { surface0 } else { Color::TRANSPARENT },
+                background_color: if i == 0 {
+                    surface0
+                } else {
+                    Color::TRANSPARENT
+                },
                 border_radius: 6.0,
                 ..Default::default()
             }),
@@ -406,40 +473,43 @@ pub fn build_demo_tree() -> Dom {
                     height: Dimension::length(36.0),
                 },
                 padding: length_rect(8.0),
+                flex_shrink: 0.0,
                 ..Default::default()
-            },
+            }
         );
         dom.append_child(sidebar, nav);
 
         let nav_text = dom.create_element(
             Element::Text(TextProps {
                 content: label.to_string(),
-                font_size: 14.0,
-                color: if i == 0 { text_color } else { subtext },
+                font_size: 20.0,
+                color: if i == 0 {
+                    text_color
+                } else {
+                    subtext
+                },
             }),
             Style {
                 size: Size {
-                    width: Dimension::length(160.0),
-                    height: Dimension::length(20.0),
+                    width: Dimension::auto(),
+                    height: Dimension::auto(),
                 },
+                flex_shrink: 0.0,
                 ..Default::default()
-            },
+            }
         );
         dom.append_child(nav, nav_text);
     }
 
     // Main content area
-    let main_area = dom.create_element(
-        Element::Root,
-        Style {
-            display: Display::Flex,
-            flex_direction: FlexDirection::Column,
-            flex_grow: 1.0,
-            padding: length_rect(16.0),
-            gap: length_size(16.0),
-            ..Default::default()
-        },
-    );
+    let main_area = dom.create_element(Element::Root, Style {
+        display: Display::Flex,
+        flex_direction: FlexDirection::Column,
+        flex_grow: 1.0,
+        padding: length_rect(16.0),
+        gap: length_size(16.0),
+        ..Default::default()
+    });
     dom.append_child(body, main_area);
 
     // Page title
@@ -451,28 +521,26 @@ pub fn build_demo_tree() -> Dom {
         }),
         Style {
             size: Size {
-                width: Dimension::length(300.0),
-                height: Dimension::length(28.0),
+                width: Dimension::auto(),
+                height: Dimension::auto(),
             },
+            flex_shrink: 0.0,
             ..Default::default()
-        },
+        }
     );
     dom.append_child(main_area, page_title);
 
     // Top card row
-    let card_row = dom.create_element(
-        Element::Root,
-        Style {
-            display: Display::Flex,
-            flex_direction: FlexDirection::Row,
-            gap: length_size(12.0),
-            size: Size {
-                width: Dimension::auto(),
-                height: Dimension::length(100.0),
-            },
-            ..Default::default()
+    let card_row = dom.create_element(Element::Root, Style {
+        display: Display::Flex,
+        flex_direction: FlexDirection::Row,
+        gap: length_size(12.0),
+        size: Size {
+            width: Dimension::auto(),
+            height: Dimension::length(100.0),
         },
-    );
+        ..Default::default()
+    });
     dom.append_child(main_area, card_row);
 
     // Three metric cards
@@ -496,7 +564,7 @@ pub fn build_demo_tree() -> Dom {
                 padding: length_rect(16.0),
                 gap: length_size(8.0),
                 ..Default::default()
-            },
+            }
         );
         dom.append_child(card_row, card);
 
@@ -508,11 +576,11 @@ pub fn build_demo_tree() -> Dom {
             }),
             Style {
                 size: Size {
-                    width: Dimension::length(120.0),
-                    height: Dimension::length(18.0),
+                    width: Dimension::auto(),
+                    height: Dimension::auto(),
                 },
                 ..Default::default()
-            },
+            }
         );
         dom.append_child(card, card_title);
 
@@ -524,11 +592,11 @@ pub fn build_demo_tree() -> Dom {
             }),
             Style {
                 size: Size {
-                    width: Dimension::length(120.0),
-                    height: Dimension::length(32.0),
+                    width: Dimension::auto(),
+                    height: Dimension::auto(),
                 },
                 ..Default::default()
-            },
+            }
         );
         dom.append_child(card, card_value);
     }
@@ -548,7 +616,7 @@ pub fn build_demo_tree() -> Dom {
             padding: length_rect(16.0),
             gap: length_size(8.0),
             ..Default::default()
-        },
+        }
     );
     dom.append_child(main_area, bottom);
 
@@ -560,11 +628,11 @@ pub fn build_demo_tree() -> Dom {
         }),
         Style {
             size: Size {
-                width: Dimension::length(300.0),
-                height: Dimension::length(22.0),
+                width: Dimension::auto(),
+                height: Dimension::auto(),
             },
             ..Default::default()
-        },
+        }
     );
     dom.append_child(bottom, panel_title);
 
@@ -576,11 +644,11 @@ pub fn build_demo_tree() -> Dom {
         }),
         Style {
             size: Size {
-                width: Dimension::length(400.0),
-                height: Dimension::length(18.0),
+                width: Dimension::auto(),
+                height: Dimension::auto(),
             },
             ..Default::default()
-        },
+        }
     );
     dom.append_child(bottom, panel_text);
 
@@ -601,7 +669,7 @@ pub fn build_demo_tree() -> Dom {
             },
             padding: length_rect(16.0),
             ..Default::default()
-        },
+        }
     );
     dom.append_child(root, footer);
 
@@ -613,11 +681,11 @@ pub fn build_demo_tree() -> Dom {
         }),
         Style {
             size: Size {
-                width: Dimension::length(200.0),
-                height: Dimension::length(16.0),
+                width: Dimension::auto(),
+                height: Dimension::auto(),
             },
             ..Default::default()
-        },
+        }
     );
     dom.append_child(footer, footer_text);
 
