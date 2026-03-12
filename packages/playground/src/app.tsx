@@ -69,7 +69,6 @@ function MetricCard({
 function App() {
   const [count, setCount] = useState(0);
   const [showRecentActivity, setShowRecentActivity] = useState(true);
-  console.log('render', count);
 
   return (
     <view display="flex" flexDir="col" w="full" h="full" bg={BASE_BG}>
@@ -134,7 +133,6 @@ function App() {
             <text fontSize="18" color={TEXT_COLOR}>{`Count: ${count}`}</text>
             <view
               onClick={() => {
-                console.log('click');
                 setCount((c) => c + 1);
               }}
               p="8"
