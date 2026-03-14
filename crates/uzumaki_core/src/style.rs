@@ -1,7 +1,7 @@
 use refineable::Refineable;
+use vello::Scene;
 use vello::kurbo::{Affine, Rect, RoundedRect, RoundedRectRadii, Stroke};
 use vello::peniko::Color as VelloColor;
-use vello::Scene;
 
 // ── Our own Color (Default-able, Refineable-friendly) ────────────────
 
@@ -20,9 +20,24 @@ impl Default for Color {
 }
 
 impl Color {
-    pub const TRANSPARENT: Self = Self { r: 0, g: 0, b: 0, a: 0 };
-    pub const WHITE: Self = Self { r: 255, g: 255, b: 255, a: 255 };
-    pub const BLACK: Self = Self { r: 0, g: 0, b: 0, a: 255 };
+    pub const TRANSPARENT: Self = Self {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 0,
+    };
+    pub const WHITE: Self = Self {
+        r: 255,
+        g: 255,
+        b: 255,
+        a: 255,
+    };
+    pub const BLACK: Self = Self {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 255,
+    };
 
     pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self { r, g, b, a }
@@ -62,7 +77,12 @@ pub struct Bounds {
 
 impl Bounds {
     pub fn new(x: f64, y: f64, width: f64, height: f64) -> Self {
-        Self { x, y, width, height }
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 
     pub fn contains(&self, px: f64, py: f64) -> bool {
@@ -87,7 +107,12 @@ pub struct Edges {
 
 impl Edges {
     pub fn all(val: f32) -> Self {
-        Self { top: val, right: val, bottom: val, left: val }
+        Self {
+            top: val,
+            right: val,
+            bottom: val,
+            left: val,
+        }
     }
 
     pub fn any_nonzero(&self) -> bool {
@@ -106,7 +131,12 @@ pub struct Corners {
 
 impl Corners {
     pub fn uniform(val: f32) -> Self {
-        Self { top_left: val, top_right: val, bottom_right: val, bottom_left: val }
+        Self {
+            top_left: val,
+            top_right: val,
+            bottom_right: val,
+            bottom_left: val,
+        }
     }
 
     pub fn any_nonzero(&self) -> bool {
@@ -440,7 +470,13 @@ impl Style {
 
     /// Paint the visual properties into the scene at bounds.
     /// `continuation` is called between background and borders to paint children.
-    pub fn paint(&self, bounds: Bounds, scene: &mut Scene, continuation: impl FnOnce(&mut Scene)) {
+    pub fn paint(
+        &self,
+        bounds: Bounds,
+        scene: &mut Scene,
+        scale: f64,
+        continuation: impl FnOnce(&mut Scene),
+    ) {
         if self.visibility == Visibility::Hidden || self.opacity <= 0.0 {
             return;
         }
@@ -449,7 +485,7 @@ impl Style {
 
         // 1. Box shadow
         if let Some(shadow) = &self.box_shadow {
-            self.paint_shadow(bounds, scene, shadow, opacity);
+            self.paint_shadow(bounds, scene, shadow, opacity, scale);
         }
 
         // 2. Background
@@ -458,11 +494,17 @@ impl Style {
                 let vbg = bg.with_opacity(opacity).to_vello();
                 if self.corner_radii.any_nonzero() {
                     let shape = rounded_rect(bounds, &self.corner_radii);
-                    scene.fill(vello::peniko::Fill::NonZero, Affine::IDENTITY, vbg, None, &shape);
+                    scene.fill(
+                        vello::peniko::Fill::NonZero,
+                        Affine::scale(scale),
+                        vbg,
+                        None,
+                        &shape,
+                    );
                 } else {
                     scene.fill(
                         vello::peniko::Fill::NonZero,
-                        Affine::IDENTITY,
+                        Affine::scale(scale),
                         vbg,
                         None,
                         &bounds.to_rect(),
@@ -480,16 +522,23 @@ impl Style {
                 if !bc.is_transparent() {
                     let vbc = bc.with_opacity(opacity).to_vello();
                     if self.corner_radii.any_nonzero() {
-                        self.paint_rounded_borders(bounds, scene, vbc);
+                        self.paint_rounded_borders(bounds, scene, vbc, scale);
                     } else {
-                        self.paint_rect_borders(bounds, scene, vbc);
+                        self.paint_rect_borders(bounds, scene, vbc, scale);
                     }
                 }
             }
         }
     }
 
-    fn paint_shadow(&self, bounds: Bounds, scene: &mut Scene, shadow: &BoxShadow, opacity: f32) {
+    fn paint_shadow(
+        &self,
+        bounds: Bounds,
+        scene: &mut Scene,
+        shadow: &BoxShadow,
+        opacity: f32,
+        scale: f64,
+    ) {
         let spread = shadow.spread_radius as f64;
         let ox = shadow.offset_x as f64;
         let oy = shadow.offset_y as f64;
@@ -506,11 +555,17 @@ impl Style {
 
         if self.corner_radii.any_nonzero() {
             let shape = rounded_rect(expanded, &self.corner_radii);
-            scene.fill(vello::peniko::Fill::NonZero, Affine::IDENTITY, vc, None, &shape);
+            scene.fill(
+                vello::peniko::Fill::NonZero,
+                Affine::scale(scale),
+                vc,
+                None,
+                &shape,
+            );
         } else {
             scene.fill(
                 vello::peniko::Fill::NonZero,
-                Affine::IDENTITY,
+                Affine::scale(scale),
                 vc,
                 None,
                 &expanded.to_rect(),
@@ -518,20 +573,38 @@ impl Style {
         }
     }
 
-    fn paint_rounded_borders(&self, bounds: Bounds, scene: &mut Scene, color: VelloColor) {
+    fn paint_rounded_borders(
+        &self,
+        bounds: Bounds,
+        scene: &mut Scene,
+        color: VelloColor,
+        scale: f64,
+    ) {
         let bw = &self.border_widths;
 
         if let Some(width) = border_widths_equal(bw) {
             if width > 0.0 {
                 let shape = rounded_rect(bounds, &self.corner_radii);
-                scene.stroke(&Stroke::new(width as f64), Affine::IDENTITY, color, None, &shape);
+                scene.stroke(
+                    &Stroke::new(width as f64),
+                    Affine::scale(scale),
+                    color,
+                    None,
+                    &shape,
+                );
             }
             return;
         }
 
         // Fill outer, carve inner
         let outer = rounded_rect(bounds, &self.corner_radii);
-        scene.fill(vello::peniko::Fill::NonZero, Affine::IDENTITY, color, None, &outer);
+        scene.fill(
+            vello::peniko::Fill::NonZero,
+            Affine::scale(scale),
+            color,
+            None,
+            &outer,
+        );
 
         let inner_rect = Rect::new(
             bounds.x + bw.left as f64,
@@ -545,18 +618,26 @@ impl Style {
 
         let inner_radii = inset_radii(&self.corner_radii, bw);
         let inner = rounded_rect(
-            Bounds::new(inner_rect.x0, inner_rect.y0, inner_rect.width(), inner_rect.height()),
+            Bounds::new(
+                inner_rect.x0,
+                inner_rect.y0,
+                inner_rect.width(),
+                inner_rect.height(),
+            ),
             &inner_radii,
         );
 
-        let bg = self
-            .background
-            .unwrap_or(Color::TRANSPARENT)
-            .to_vello();
-        scene.fill(vello::peniko::Fill::NonZero, Affine::IDENTITY, bg, None, &inner);
+        let bg = self.background.unwrap_or(Color::TRANSPARENT).to_vello();
+        scene.fill(
+            vello::peniko::Fill::NonZero,
+            Affine::scale(scale),
+            bg,
+            None,
+            &inner,
+        );
     }
 
-    fn paint_rect_borders(&self, bounds: Bounds, scene: &mut Scene, color: VelloColor) {
+    fn paint_rect_borders(&self, bounds: Bounds, scene: &mut Scene, color: VelloColor, scale: f64) {
         let bw = &self.border_widths;
         let x = bounds.x;
         let y = bounds.y;
@@ -567,7 +648,7 @@ impl Style {
             if width > 0.0 {
                 scene.stroke(
                     &Stroke::new(width as f64),
-                    Affine::IDENTITY,
+                    Affine::scale(scale),
                     color,
                     None,
                     &Rect::new(x, y, x + w, y + h),
@@ -577,7 +658,13 @@ impl Style {
         }
 
         let fill = |scene: &mut Scene, rect: Rect| {
-            scene.fill(vello::peniko::Fill::NonZero, Affine::IDENTITY, color, None, &rect);
+            scene.fill(
+                vello::peniko::Fill::NonZero,
+                Affine::scale(scale),
+                color,
+                None,
+                &rect,
+            );
         };
 
         if bw.top > 0.0 {

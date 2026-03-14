@@ -574,9 +574,12 @@ impl ApplicationHandler<UserEvent> for Application {
             }
             WindowEvent::CursorMoved { position, .. } => {
                 if let Some(window) = self.windows.get_mut(&window_id) {
+                    let scale = window.winit_window.scale_factor();
+                    let logical_x = position.x / scale;
+                    let logical_y = position.y / scale;
                     let mut dom = window.dom.lock();
                     let old_top = dom.hit_state.top_hit;
-                    dom.update_hit_test(position.x, position.y);
+                    dom.update_hit_test(logical_x, logical_y);
                     let new_top = dom.hit_state.top_hit;
                     if old_top != new_top {
                         needs_redraw = true;

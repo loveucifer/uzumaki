@@ -22,7 +22,11 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new(gpu: &GpuContext, winit_window: Arc<WinitWindow>, dom: Arc<Mutex<Dom>>) -> Result<Self> {
+    pub fn new(
+        gpu: &GpuContext,
+        winit_window: Arc<WinitWindow>,
+        dom: Arc<Mutex<Dom>>,
+    ) -> Result<Self> {
         let surface = gpu
             .instance
             .create_surface(winit_window.clone())
@@ -79,11 +83,7 @@ impl Window {
         self.winit_window.id()
     }
 
-    pub(crate) fn paint_and_present(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-    ) {
+    pub(crate) fn paint_and_present(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
         if !self.valid_surface {
             return;
         }
@@ -91,12 +91,14 @@ impl Window {
         let width = self.surface_config.width;
         let height = self.surface_config.height;
 
-        // Lock DOM for layout + scene building
+        self.scene.reset();
+
+        let scale = self.winit_window.scale_factor();
         {
             let mut dom = self.dom.lock();
-            dom.compute_layout(width as f32, height as f32, &mut self.text_renderer);
-            self.scene.reset();
-            dom.render(&mut self.scene, &mut self.text_renderer);
+            // Layout uses logical pixels; rendering uses physical via Affine::scale
+            dom.compute_layout(width as f32 / scale as f32, height as f32 / scale as f32, &mut self.text_renderer);
+            dom.render(&mut self.scene, &mut self.text_renderer, scale);
         }
 
         // Render vello scene into an intermediate STORAGE texture
@@ -148,8 +150,7 @@ impl Window {
             });
 
         let blitter = wgpu::util::TextureBlitter::new(device, self.surface_config.format);
-        let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         blitter.copy(device, &mut encoder, &target_view, &surface_view);
         queue.submit([encoder.finish()]);
         surface_texture.present();

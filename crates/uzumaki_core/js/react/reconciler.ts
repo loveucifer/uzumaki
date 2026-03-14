@@ -4,7 +4,6 @@ import type { JSX } from './jsx/runtime';
 import type { Window } from '..';
 import * as core from '../bindings';
 
-
 const STYLE_PROPS = new Set([
   'h',
   'w',
@@ -49,7 +48,6 @@ const STYLE_PROPS = new Set([
   'display',
 ]);
 
-
 const eventRegistry = new Map<string, Map<string, Function>>();
 
 export function registerEvent(nodeId: string, eventType: string, cb: Function) {
@@ -68,7 +66,6 @@ export function dispatchEvent(
 ) {
   eventRegistry.get(nodeId)?.get(eventType)?.(payload);
 }
-
 
 class UElement {
   id: string;
@@ -120,12 +117,10 @@ class UElement {
   }
 }
 
-
 type Container = {
   window: Window;
   rootNodeId: string;
 };
-
 
 function getLabel(container: Container): string {
   return container.window.label;
@@ -136,7 +131,6 @@ function getTextContent(children: any): string {
   if (Array.isArray(children)) return children.join('');
   return String(children);
 }
-
 
 type Type = string;
 type Props = Record<string, any>;
@@ -279,14 +273,7 @@ const reconciler = ReactReconciler<
     unregisterEvents(child.id);
   },
 
-
-  commitUpdate(
-    instance,
-    type,
-    oldProps,
-    newProps,
-    _internalHandle,
-  ) {
+  commitUpdate(instance, type, oldProps, newProps, _internalHandle) {
     const label = instance.label;
 
     // Parse new props
@@ -401,6 +388,7 @@ const reconciler = ReactReconciler<
   },
 
   clearContainer(container) {
+    console.log('[reconciler]: clear container');
     // No-op: React handles removing children individually
   },
 
@@ -418,15 +406,15 @@ const reconciler = ReactReconciler<
     currentContainer = null;
   },
 
-  preparePortalMount: () => { },
+  preparePortalMount: () => {},
   scheduleTimeout: (fn, delay) => setTimeout(fn, delay),
   cancelTimeout: (id) => clearTimeout(id),
   noTimeout: undefined,
   isPrimaryRenderer: true,
   getInstanceFromNode: () => null,
-  beforeActiveInstanceBlur: () => { },
-  afterActiveInstanceBlur: () => { },
-  prepareScopeUpdate: () => { },
+  beforeActiveInstanceBlur: () => {},
+  afterActiveInstanceBlur: () => {},
+  prepareScopeUpdate: () => {},
   getInstanceFromScope: () => null,
   supportsHydration: false,
   NotPendingTransition: undefined,
@@ -440,19 +428,18 @@ const reconciler = ReactReconciler<
   },
   getCurrentUpdatePriority: () => currentPriority,
   resolveUpdatePriority: () => DefaultEventPriority,
-  resetFormInstance: () => { },
-  requestPostPaintCallback: () => { },
+  resetFormInstance: () => {},
+  requestPostPaintCallback: () => {},
   shouldAttemptEagerTransition: () => false,
-  trackSchedulerEvent: () => { },
+  trackSchedulerEvent: () => {},
   resolveEventType: () => null,
   resolveEventTimeStamp: () => Date.now(),
   maySuspendCommit: () => false,
   preloadInstance: () => false,
   startSuspendingCommit: () => false,
-  suspendInstance: () => { },
+  suspendInstance: () => {},
   waitForCommitToBeReady: () => null,
 });
-
 
 export function render(window: Window, element: JSX.Element) {
   const rootNodeId = core.getRootNodeId(window.label);
@@ -468,7 +455,7 @@ export function render(window: Window, element: JSX.Element) {
     console.error,
     console.error,
     console.error,
-    () => { },
+    () => {},
   );
 
   reconciler.updateContainer(element, root, null, null);

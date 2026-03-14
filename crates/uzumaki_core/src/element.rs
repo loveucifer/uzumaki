@@ -245,9 +245,7 @@ impl Dom {
     /// Update a text node's content.
     pub fn set_text_content(&mut self, node_id: NodeId, text: String) {
         let node = &mut self.nodes[node_id];
-        let tc = TextContent {
-            content: text,
-        };
+        let tc = TextContent { content: text };
         node.kind = ElementKind::Text(tc.clone());
         let taffy_node = node.taffy_node;
         let font_size = node.style.text.font_size;
@@ -299,11 +297,11 @@ impl Dom {
     }
 
     /// Render the DOM tree into the scene. Also rebuilds hitboxes.
-    pub fn render(&mut self, scene: &mut Scene, text_renderer: &mut TextRenderer) {
+    pub fn render(&mut self, scene: &mut Scene, text_renderer: &mut TextRenderer, scale: f64) {
         self.hitbox_store.clear();
 
         if let Some(root) = self.root {
-            self.render_tree(scene, text_renderer, root);
+            self.render_tree(scene, text_renderer, root, scale);
         }
     }
 
@@ -312,6 +310,7 @@ impl Dom {
         scene: &mut Scene,
         text_renderer: &mut TextRenderer,
         root_id: NodeId,
+        scale: f64,
     ) {
         // Collect render info for all nodes in DFS order
         struct RenderInfo {
@@ -389,7 +388,7 @@ impl Dom {
 
             match &info.text {
                 Some((content, font_size, color)) => {
-                    info.style.paint(bounds, scene, |scene| {
+                    info.style.paint(bounds, scene, scale, |scene| {
                         text_renderer.draw_text(
                             scene,
                             content,
@@ -399,12 +398,13 @@ impl Dom {
                             info.h as f32,
                             (info.x as f32, info.y as f32),
                             color.to_vello(),
+                            scale,
                         );
                     });
                 }
                 None => {
                     // View: paint bg + borders, children paint themselves in order
-                    info.style.paint(bounds, scene, |_scene| {});
+                    info.style.paint(bounds, scene, scale, |_scene| {});
                 }
             }
         }

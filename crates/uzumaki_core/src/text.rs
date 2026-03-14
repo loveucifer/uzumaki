@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use cosmic_text::fontdb;
 use cosmic_text::{Attrs, Buffer, FontSystem, Metrics, Shaping};
+use vello::kurbo::Affine;
 use vello::peniko::{Blob, Brush, Color, Fill, FontData};
 use vello::{Glyph, Scene};
 
@@ -88,6 +89,7 @@ impl TextRenderer {
         height: f32,
         position: (f32, f32),
         color: Color,
+        scale: f64,
     ) {
         let buffer = self.layout_buffer(text, attrs, font_size, Some(width), Some(height));
         self.cache_fonts_from_buffer(&buffer);
@@ -120,6 +122,7 @@ impl TextRenderer {
                     scene
                         .draw_glyphs(vello_font)
                         .font_size(font_size)
+                        .transform(Affine::scale(scale))
                         .brush(&Brush::Solid(color))
                         .draw(Fill::NonZero, glyphs.into_iter());
                 }
