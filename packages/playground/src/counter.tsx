@@ -1,13 +1,6 @@
 import { useState } from 'react';
 
-import {
-  ACCENT_BLUE,
-  ACTIVE_BG,
-  BASE_BG,
-  HOVER_BG,
-  NAV_ACTIVE,
-  TEXT_COLOR,
-} from './styles';
+import { ACCENT_BLUE, BASE_BG } from './styles';
 import { Button } from './button';
 
 export function App() {

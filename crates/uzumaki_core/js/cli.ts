@@ -49,7 +49,7 @@ async function run(entryPoint: string) {
     process.exit(1);
   }
 
-  runApp({ entryFilePath: entryFile });
+  await runApp({ entryFilePath: entryFile });
 }
 
 function isWindows(): boolean {

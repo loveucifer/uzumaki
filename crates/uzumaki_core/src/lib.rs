@@ -1,9 +1,9 @@
 use napi::bindgen_prelude::*;
-use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
-use std::{collections::HashMap, sync::Arc, sync::LazyLock};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::time::Duration;
 
 use napi_derive::napi;
-use parking_lot::Mutex;
 use winit::{
     application::ApplicationHandler,
     event_loop::{EventLoop, EventLoopProxy},
@@ -23,10 +23,11 @@ use crate::element::{Dom, NodeId};
 use crate::gpu::GpuContext;
 use crate::style::*;
 
-static LOOP_PROXY: Mutex<Option<EventLoopProxy<UserEvent>>> = Mutex::new(None);
-static DOM_REGISTRY: LazyLock<Mutex<HashMap<String, Arc<Mutex<Dom>>>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-static DOM_EVENT_CB: Mutex<Option<ThreadsafeFunction<AppEvent>>> = Mutex::new(None);
+thread_local! {
+    static LOOP_PROXY: RefCell<Option<EventLoopProxy<UserEvent>>> = RefCell::new(None);
+    static DOM_REGISTRY: RefCell<HashMap<String, RefCell<Dom>>> = RefCell::new(HashMap::new());
+    static PENDING_EVENTS: RefCell<Vec<AppEvent>> = RefCell::new(Vec::new());
+}
 
 #[napi(object)]
 pub struct DomEventData {
@@ -58,9 +59,8 @@ impl From<DomEventData> for AppEvent {
 }
 
 #[napi]
-pub fn listen_app_events(callback: ThreadsafeFunction<AppEvent>) {
-    let mut lock = DOM_EVENT_CB.lock();
-    *lock = Some(callback);
+pub fn poll_events() -> Vec<AppEvent> {
+    PENDING_EVENTS.with(|q| q.borrow_mut().drain(..).collect())
 }
 
 enum UserEvent {
@@ -84,6 +84,14 @@ pub struct WindowOptions {
     pub title: String,
 }
 
+fn with_proxy(f: impl FnOnce(&EventLoopProxy<UserEvent>)) {
+    LOOP_PROXY.with(|p| {
+        if let Some(proxy) = &*p.borrow() {
+            f(proxy);
+        }
+    });
+}
+
 #[napi]
 pub fn create_window(options: WindowOptions) {
     // Create DOM immediately so JS can call getRootNodeId right after
@@ -98,41 +106,41 @@ pub fn create_window(options: WindowOptions) {
     });
     dom.set_root(root);
 
-    let dom_arc = Arc::new(Mutex::new(dom));
-    DOM_REGISTRY.lock().insert(options.label.clone(), dom_arc);
+    DOM_REGISTRY.with(|reg| {
+        reg.borrow_mut()
+            .insert(options.label.clone(), RefCell::new(dom));
+    });
 
-    let proxy = LOOP_PROXY.lock();
-    if let Some(proxy) = &*proxy {
+    with_proxy(|proxy| {
         let _ = proxy.send_event(UserEvent::CreateWindow {
             label: options.label,
             width: options.width,
             height: options.height,
             title: options.title,
         });
-    }
+    });
 }
 
 #[napi]
 pub fn request_quit() {
-    let proxy = LOOP_PROXY.lock();
-    if let Some(proxy) = &*proxy {
+    with_proxy(|proxy| {
         let _ = proxy.send_event(UserEvent::Quit);
-    }
+    });
 }
 
 #[napi]
 pub fn request_redraw(label: String) {
-    let proxy = LOOP_PROXY.lock();
-    if let Some(proxy) = &*proxy {
+    with_proxy(|proxy| {
         let _ = proxy.send_event(UserEvent::RequestRedraw { label });
-    }
+    });
 }
 
 fn with_dom<R>(label: &str, f: impl FnOnce(&mut Dom) -> R) -> R {
-    let registry = DOM_REGISTRY.lock();
-    let dom_arc = registry.get(label).expect("window not found");
-    let mut dom = dom_arc.lock();
-    f(&mut dom)
+    DOM_REGISTRY.with(|reg| {
+        let reg = reg.borrow();
+        let dom_cell = reg.get(label).expect("window not found");
+        f(&mut dom_cell.borrow_mut())
+    })
 }
 
 #[napi]
@@ -447,6 +455,7 @@ pub struct Application {
     windows: HashMap<WindowId, Window>,
     window_label_to_id: HashMap<String, WindowId>,
     window_id_to_label: HashMap<WindowId, String>,
+    event_loop: Option<EventLoop<UserEvent>>,
 }
 
 #[napi]
@@ -455,28 +464,46 @@ impl Application {
     pub fn new() -> Self {
         let gpu = pollster::block_on(GpuContext::new()).expect("Failed to create GPU context");
 
+        let event_loop = EventLoop::<UserEvent>::with_user_event()
+            .build()
+            .expect("Error creating event loop");
+
+        LOOP_PROXY.with(|p| {
+            *p.borrow_mut() = Some(event_loop.create_proxy());
+        });
+
         Self {
             gpu,
             on_init: None,
             windows: Default::default(),
             window_label_to_id: Default::default(),
             window_id_to_label: Default::default(),
+            event_loop: Some(event_loop),
         }
     }
 
-    fn insert_window(&mut self, winit_window: Arc<winit::window::Window>, label: String) {
+    fn insert_window(
+        &mut self,
+        winit_window: std::sync::Arc<winit::window::Window>,
+        label: String,
+    ) {
         assert!(
             !self.window_label_to_id.contains_key(&label),
             "Window with label '{}' already exists",
             label
         );
 
-        let dom = DOM_REGISTRY.lock().get(&label).cloned().unwrap_or_else(|| {
-            // Fallback: create a demo tree if no pre-created DOM exists
-            Arc::new(Mutex::new(crate::element::build_demo_tree()))
-        });
+        let has_dom = DOM_REGISTRY.with(|reg| reg.borrow().contains_key(&label));
+        if !has_dom {
+            DOM_REGISTRY.with(|reg| {
+                reg.borrow_mut().insert(
+                    label.clone(),
+                    RefCell::new(crate::element::build_demo_tree()),
+                );
+            });
+        }
 
-        match Window::new(&self.gpu, winit_window, dom) {
+        match Window::new(&self.gpu, winit_window) {
             Ok(window) => {
                 let wid = window.id();
                 self.window_label_to_id.insert(label.clone(), wid);
@@ -495,39 +522,24 @@ impl Application {
     }
 
     #[napi]
-    pub fn run(&mut self) {
-        let event_loop = EventLoop::<UserEvent>::with_user_event()
-            .build()
-            .expect("Error creating event loop");
+    pub fn pump_app_events(&mut self) -> bool {
+        use winit::platform::pump_events::EventLoopExtPumpEvents;
+        use winit::platform::pump_events::PumpStatus;
 
-        {
-            let mut lock = LOOP_PROXY.lock();
-            *lock = Some(event_loop.create_proxy());
-        }
+        let mut event_loop = self.event_loop.take().expect("event loop not initialized");
+        let status = event_loop.pump_app_events(Some(Duration::ZERO), self);
+        self.event_loop = Some(event_loop);
 
-        ctrlc::set_handler(|| {
-            println!("SIGINT received, exiting...");
-            request_quit();
-        })
-        .expect("error setting quit handler");
-
-        println!("Starting event loop ");
-        event_loop.run_app(self).expect("Error running event loop ");
-
-        {
-            let mut lock = LOOP_PROXY.lock();
-            lock.take();
-        }
+        matches!(status, PumpStatus::Continue)
     }
 }
 
 impl ApplicationHandler<UserEvent> for Application {
     fn resumed(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
-        println!("Application init");
+        println!("Application resumed");
         if let Some(cb) = self.on_init.take() {
             let _ = cb.call(());
         }
-        println!("Application initialized");
     }
 
     fn user_event(&mut self, event_loop: &winit::event_loop::ActiveEventLoop, event: UserEvent) {
@@ -553,7 +565,7 @@ impl ApplicationHandler<UserEvent> for Application {
                     return;
                 };
 
-                let window = Arc::new(winit_window);
+                let window = std::sync::Arc::new(winit_window);
                 self.insert_window(window, label);
             }
             UserEvent::RequestRedraw { label } => {
@@ -590,21 +602,27 @@ impl ApplicationHandler<UserEvent> for Application {
                 }
             }
             WindowEvent::RedrawRequested => {
-                if let Some(window) = self.windows.get_mut(&window_id) {
-                    window.paint_and_present(&self.gpu.device, &self.gpu.queue);
+                let label = self.window_id_to_label.get(&window_id).cloned();
+                if let Some(label) = label {
+                    if let Some(window) = self.windows.get_mut(&window_id) {
+                        with_dom(&label, |dom| {
+                            window.paint_and_present(&self.gpu.device, &self.gpu.queue, dom);
+                        });
+                    }
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
-                if let Some(window) = self.windows.get_mut(&window_id) {
-                    let scale = window.winit_window.scale_factor();
-                    let logical_x = position.x / scale;
-                    let logical_y = position.y / scale;
-                    let mut dom = window.dom.lock();
-                    let old_top = dom.hit_state.top_hit;
-                    dom.update_hit_test(logical_x, logical_y);
-                    let new_top = dom.hit_state.top_hit;
-                    if old_top != new_top {
-                        needs_redraw = true;
+                let label = self.window_id_to_label.get(&window_id).cloned();
+                if let Some(label) = label {
+                    if let Some(window) = self.windows.get(&window_id) {
+                        let scale = window.winit_window.scale_factor();
+                        let logical_x = position.x / scale;
+                        let logical_y = position.y / scale;
+                        needs_redraw = with_dom(&label, |dom| {
+                            let old_top = dom.hit_state.top_hit;
+                            dom.update_hit_test(logical_x, logical_y);
+                            old_top != dom.hit_state.top_hit
+                        });
                     }
                 }
             }
@@ -618,44 +636,48 @@ impl ApplicationHandler<UserEvent> for Application {
                     _ => crate::interactivity::MouseButton::Left,
                 };
 
-                if let Some(window) = self.windows.get_mut(&window_id) {
-                    let mut dom = window.dom.lock();
-                    if let Some((mx, my)) = dom.hit_state.mouse_position {
-                        match state {
-                            ElementState::Pressed => {
-                                let top = dom.hit_state.top_hit;
-                                dom.set_active(top);
-                                dom.dispatch_mouse_down(mx, my, mouse_button);
-                                needs_redraw = true;
-                            }
-                            ElementState::Released => {
-                                dom.dispatch_mouse_up(mx, my, mouse_button);
-                                if let Some(active) = dom.hit_state.active_hitbox {
-                                    if dom.hit_state.is_hovered(active) {
-                                        dom.dispatch_click(mx, my, mouse_button);
-                                        // Collect node IDs with js_interactive for JS dispatch
-                                        for hitbox in dom.hitbox_store.hitboxes().iter().rev() {
-                                            if hitbox.bounds.contains(mx, my) {
-                                                let node = &dom.nodes[hitbox.node_id];
-                                                if node.interactivity.js_interactive {
-                                                    js_click_node_ids
-                                                        .push(hitbox.node_id.to_string_id());
+                let label = self.window_id_to_label.get(&window_id).cloned();
+                if let Some(label) = label {
+                    with_dom(&label, |dom| {
+                        if let Some((mx, my)) = dom.hit_state.mouse_position {
+                            match state {
+                                ElementState::Pressed => {
+                                    let top = dom.hit_state.top_hit;
+                                    dom.set_active(top);
+                                    dom.dispatch_mouse_down(mx, my, mouse_button);
+                                    needs_redraw = true;
+                                }
+                                ElementState::Released => {
+                                    dom.dispatch_mouse_up(mx, my, mouse_button);
+                                    if let Some(active) = dom.hit_state.active_hitbox {
+                                        if dom.hit_state.is_hovered(active) {
+                                            dom.dispatch_click(mx, my, mouse_button);
+                                            for hitbox in
+                                                dom.hitbox_store.hitboxes().iter().rev()
+                                            {
+                                                if hitbox.bounds.contains(mx, my) {
+                                                    let node = &dom.nodes[hitbox.node_id];
+                                                    if node.interactivity.js_interactive {
+                                                        js_click_node_ids
+                                                            .push(hitbox.node_id.to_string_id());
+                                                    }
                                                 }
                                             }
                                         }
                                     }
+                                    dom.set_active(None);
+                                    needs_redraw = true;
                                 }
-                                dom.set_active(None);
-                                needs_redraw = true;
                             }
                         }
-                    }
+                    });
                 }
             }
             WindowEvent::CursorLeft { .. } => {
-                if let Some(window) = self.windows.get_mut(&window_id) {
-                    let mut dom = window.dom.lock();
-                    dom.hit_state = Default::default();
+                if let Some(label) = self.window_id_to_label.get(&window_id).cloned() {
+                    with_dom(&label, |dom| {
+                        dom.hit_state = Default::default();
+                    });
                     needs_redraw = true;
                 }
             }
@@ -663,7 +685,9 @@ impl ApplicationHandler<UserEvent> for Application {
                 println!("Close window event");
                 if let Some(label) = self.window_id_to_label.remove(&window_id) {
                     self.window_label_to_id.remove(&label);
-                    DOM_REGISTRY.lock().remove(&label);
+                    DOM_REGISTRY.with(|reg| {
+                        reg.borrow_mut().remove(&label);
+                    });
                 }
                 self.windows.remove(&window_id);
                 if self.windows.is_empty() {
@@ -673,23 +697,19 @@ impl ApplicationHandler<UserEvent> for Application {
             _ => {}
         }
 
-        // Dispatch JS click events via global ThreadsafeFunction
-        // todo send once
+        // Push JS click events to the pending event queue
         if !js_click_node_ids.is_empty() {
             if let Some(label) = self.window_id_to_label.get(&window_id) {
-                let lock = DOM_EVENT_CB.lock();
-                if let Some(cb) = &*lock {
+                PENDING_EVENTS.with(|q| {
+                    let mut q = q.borrow_mut();
                     for node_id_str in js_click_node_ids {
-                        let _ = cb.call(
-                            Ok(AppEvent::from(DomEventData {
-                                window_label: label.clone(),
-                                node_id: node_id_str,
-                                event_type: "click".to_string(),
-                            })),
-                            ThreadsafeFunctionCallMode::NonBlocking,
-                        );
+                        q.push(AppEvent::from(DomEventData {
+                            window_label: label.clone(),
+                            node_id: node_id_str,
+                            event_type: "click".to_string(),
+                        }));
                     }
-                }
+                });
             }
         }
 

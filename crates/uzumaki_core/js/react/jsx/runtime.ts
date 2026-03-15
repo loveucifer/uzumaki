@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { createElement } from 'react';
 
-interface StyleProps {
+interface ElementStyles {
   h?: number | string;
   w?: number | string;
   p?: number | string;
@@ -18,7 +18,7 @@ interface StyleProps {
   mb?: number | string;
   ml?: number | string;
   mr?: number | string;
-  flex?: string | number;
+  flex?: string | number | true;
   flexDir?: 'row' | 'col' | 'column';
   flexGrow?: number | string;
   flexShrink?: number | string;
@@ -43,18 +43,23 @@ interface StyleProps {
   opacity?: number | string;
   cursor?: string;
   display?: 'flex' | 'none' | 'block';
-  'hover:bg'?: string;
-  'hover:color'?: string;
-  'hover:opacity'?: number | string;
-  'hover:borderColor'?: string;
-  'active:bg'?: string;
-  'active:color'?: string;
 }
 
+type PrefixedStyles<Prefix extends string> = {
+  [K in keyof ElementStyles as `${Prefix}:${string & K}`]?: ElementStyles[K];
+};
+
+type HoverStyles = PrefixedStyles<'hover'>;
+type ActiveStyles = PrefixedStyles<'active'>;
+type FocusStyles = PrefixedStyles<'focus'>;
+
+interface ElementAttributes
+  extends ElementStyles, HoverStyles, ActiveStyles, FocusStyles {}
+
 interface EventProps {
-  onClick?: (payload?: unknown) => void;
-  onMouseDown?: (payload?: unknown) => void;
-  onMouseUp?: (payload?: unknown) => void;
+  onClick?: (ev?: unknown) => void;
+  onMouseDown?: (ev?: unknown) => void;
+  onMouseUp?: (ev?: unknown) => void;
 }
 
 export namespace JSX {
@@ -63,22 +68,26 @@ export namespace JSX {
   export interface ElementClass {}
 
   export interface IntrinsicElements {
-    view: StyleProps & EventProps & {
-      children?: any;
-      key?: string | number;
-    };
-    text: StyleProps & EventProps & {
-      children?: any;
-      key?: string | number;
-    };
-    p: StyleProps & EventProps & {
-      children?: any;
-      key?: string | number;
-    };
-    button: StyleProps & EventProps & {
-      children?: any;
-      key?: string | number;
-    };
+    view: ElementAttributes &
+      EventProps & {
+        children?: any;
+        key?: string | number;
+      };
+    text: ElementAttributes &
+      EventProps & {
+        children?: any;
+        key?: string | number;
+      };
+    p: ElementAttributes &
+      EventProps & {
+        children?: any;
+        key?: string | number;
+      };
+    button: ElementAttributes &
+      EventProps & {
+        children?: any;
+        key?: string | number;
+      };
   }
 }
 

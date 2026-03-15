@@ -1,5 +1,7 @@
-import { fileURLToPath } from 'bun';
-import { Application, createWindow } from './bindings';
+import { Application, createWindow, pollEvents } from './bindings';
+import { dispatchEvent } from './react/reconciler';
+import { AppEventKind } from './bindings';
+import { requestQuit } from './bindings';
 
 export interface WindowAttributes {
   width: number;
@@ -49,29 +51,48 @@ export class Window {
 
 export { render } from './react';
 
-export function runApp({
+export async function runApp({
   entryFilePath,
   title = 'uzumaki',
 }: {
   entryFilePath: string;
   title?: string;
 }) {
-  let app = new Application();
+  const app = new Application();
 
-  process.on('SIGINT', () => {});
-  process.on('SIGTERM', () => {});
+  function shutdown() {
+    requestQuit();
+    setTimeout(() => {
+      process.exit(0);
+    }, 1000);
+  }
 
-  const worker = new Worker(fileURLToPath(new URL('./main', import.meta.url)), {
-    env: { ...process.env, entryPoint: entryFilePath },
-  });
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 
-  worker.onerror = (e) => {
+  // we should do it later ?
+  try {
+    await import(entryFilePath);
+  } catch (e) {
+    console.error('Error running entry point');
     console.error(e);
     process.exit(1);
-  };
+  }
 
-  app.run();
+  // Main loop: pump winit events, then drain and dispatch JS events.
+  while (true) {
+    const running = app.pumpAppEvents();
+    if (!running) break;
 
-  worker.terminate();
+    const events = pollEvents();
+    for (const event of events) {
+      if (event.kind === AppEventKind.DomEvent && event.domEvent) {
+        dispatchEvent(event.domEvent.nodeId, event.domEvent.eventType);
+      }
+    }
+
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+
   console.log('Bye');
 }
