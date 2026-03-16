@@ -19,7 +19,7 @@ export function App() {
       <text fontSize={24}>Uzumaki X React</text>
 
       <Button
-        onClick={() => {
+        onClick={(ev) => {
           setCount((c) => c + 1);
         }}
       >

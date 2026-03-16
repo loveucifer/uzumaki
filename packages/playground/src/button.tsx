@@ -1,3 +1,4 @@
+import type { UzumakiMouseEvent } from 'uzumaki';
 import { ACTIVE_BG, HOVER_BG, NAV_ACTIVE, TEXT_COLOR } from './styles';
 
 export function Button({
@@ -5,7 +6,7 @@ export function Button({
   children,
   ...props
 }: {
-  onClick?: () => void;
+  onClick?: (event: UzumakiMouseEvent) => void;
   children?: React.ReactNode;
   [key: string]: any;
 }) {

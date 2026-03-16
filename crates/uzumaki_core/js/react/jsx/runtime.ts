@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { createElement } from 'react';
+import type { UzumakiMouseEvent, UzumakiKeyboardEvent } from '../../events';
 
 interface ElementStyles {
   h?: number | string;
@@ -57,9 +58,11 @@ interface ElementAttributes
   extends ElementStyles, HoverStyles, ActiveStyles, FocusStyles {}
 
 interface EventProps {
-  onClick?: (ev?: unknown) => void;
-  onMouseDown?: (ev?: unknown) => void;
-  onMouseUp?: (ev?: unknown) => void;
+  onClick?: (ev: UzumakiMouseEvent) => void;
+  onMouseDown?: (ev: UzumakiMouseEvent) => void;
+  onMouseUp?: (ev: UzumakiMouseEvent) => void;
+  onKeyDown?: (ev: UzumakiKeyboardEvent) => void;
+  onKeyUp?: (ev: UzumakiKeyboardEvent) => void;
 }
 
 export namespace JSX {

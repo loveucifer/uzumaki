@@ -40,6 +40,10 @@ struct AppState {
     windows: HashMap<u32, WindowEntry>,
     winit_id_to_id: HashMap<WindowId, u32>,
     pending_events: Vec<AppEvent>,
+    /// Bitmask of currently pressed mouse buttons (1=left, 2=right, 4=middle)
+    mouse_buttons: u8,
+    /// Bitmask of keyboard modifiers (1=ctrl, 2=alt, 4=shift, 8=meta)
+    modifiers: u32,
 }
 
 thread_local! {
@@ -65,9 +69,15 @@ fn send_proxy_event(event: UserEvent) {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct NodeEventData {
+struct MouseEventData {
     window_id: u32,
     node_id: NodeId,
+    x: f32,
+    y: f32,
+    screen_x: f32,
+    screen_y: f32,
+    button: u8,
+    buttons: u8,
 }
 
 #[derive(Serialize)]
@@ -75,6 +85,10 @@ struct NodeEventData {
 struct KeyEventData {
     window_id: u32,
     key: String,
+    code: String,
+    key_code: u32,
+    modifiers: u32,
+    repeat: bool,
 }
 
 #[derive(Serialize)]
@@ -88,9 +102,9 @@ struct ResizeEventData {
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 enum AppEvent {
-    Click(NodeEventData),
-    MouseDown(NodeEventData),
-    MouseUp(NodeEventData),
+    Click(MouseEventData),
+    MouseDown(MouseEventData),
+    MouseUp(MouseEventData),
     KeyDown(KeyEventData),
     KeyUp(KeyEventData),
     Resize(ResizeEventData),
@@ -641,6 +655,8 @@ impl Application {
                 windows: HashMap::new(),
                 winit_id_to_id: HashMap::new(),
                 pending_events: Vec::new(),
+                mouse_buttons: 0,
+                modifiers: 0,
             });
         });
 
@@ -773,7 +789,6 @@ impl ApplicationHandler<UserEvent> for Application {
             };
 
             let mut needs_redraw = false;
-            let mut js_node_events: Vec<(NodeId, &str)> = Vec::new();
 
             match event {
                 WindowEvent::Resized(size) => {
@@ -831,45 +846,84 @@ impl ApplicationHandler<UserEvent> for Application {
                         _ => crate::interactivity::MouseButton::Left,
                     };
 
+                    // button number: 0=left, 1=middle, 2=right (browser spec)
+                    let button_num: u8 = match button {
+                        winit::event::MouseButton::Left => 0,
+                        winit::event::MouseButton::Middle => 1,
+                        winit::event::MouseButton::Right => 2,
+                        _ => 0,
+                    };
+                    // buttons bitmask: 1=left, 2=right, 4=middle (browser spec)
+                    let button_bit: u8 = match button_num {
+                        0 => 1,
+                        1 => 4,
+                        2 => 2,
+                        _ => 0,
+                    };
+
+                    // Update button state before building the event
+                    match btn_state {
+                        ElementState::Pressed => state.mouse_buttons |= button_bit,
+                        ElementState::Released => state.mouse_buttons &= !button_bit,
+                    }
+                    let buttons = state.mouse_buttons;
+
+                    // Collect event data while windows is borrowed
+                    let mut mouse_events: Vec<AppEvent> = Vec::new();
+
                     if let Some(entry) = state.windows.get_mut(&wid) {
                         let dom = &mut entry.dom;
                         if let Some((mx, my)) = dom.hit_state.mouse_position {
+                            let x = mx as f32;
+                            let y = my as f32;
+
+                            // Resolve topmost hit → NodeId for JS event target
+                            let js_target = dom.hit_state.top_hit
+                                .and_then(|hid| dom.hitbox_store.get(hid))
+                                .map(|hb| hb.node_id);
+
                             match btn_state {
                                 ElementState::Pressed => {
                                     let top = dom.hit_state.top_hit;
                                     dom.set_active(top);
                                     dom.dispatch_mouse_down(mx, my, mouse_button);
-                                    for hitbox in dom.hitbox_store.hitboxes().iter().rev() {
-                                        if hitbox.bounds.contains(mx, my) {
-                                            let node = &dom.nodes[hitbox.node_id];
-                                            if node.interactivity.js_interactive {
-                                                js_node_events.push((hitbox.node_id, "mousedown"));
-                                            }
-                                        }
+                                    if let Some(target) = js_target {
+                                        mouse_events.push(AppEvent::MouseDown(MouseEventData {
+                                            window_id: wid,
+                                            node_id: target,
+                                            x, y,
+                                            screen_x: x, screen_y: y,
+                                            button: button_num,
+                                            buttons,
+                                        }));
                                     }
                                     needs_redraw = true;
                                 }
                                 ElementState::Released => {
                                     dom.dispatch_mouse_up(mx, my, mouse_button);
-                                    for hitbox in dom.hitbox_store.hitboxes().iter().rev() {
-                                        if hitbox.bounds.contains(mx, my) {
-                                            let node = &dom.nodes[hitbox.node_id];
-                                            if node.interactivity.js_interactive {
-                                                js_node_events.push((hitbox.node_id, "mouseup"));
-                                            }
-                                        }
+                                    if let Some(target) = js_target {
+                                        mouse_events.push(AppEvent::MouseUp(MouseEventData {
+                                            window_id: wid,
+                                            node_id: target,
+                                            x, y,
+                                            screen_x: x, screen_y: y,
+                                            button: button_num,
+                                            buttons,
+                                        }));
                                     }
+                                    // Click fires if released on the same element that was pressed
                                     if let Some(active) = dom.hit_state.active_hitbox {
                                         if dom.hit_state.is_hovered(active) {
                                             dom.dispatch_click(mx, my, mouse_button);
-                                            for hitbox in dom.hitbox_store.hitboxes().iter().rev() {
-                                                if hitbox.bounds.contains(mx, my) {
-                                                    let node = &dom.nodes[hitbox.node_id];
-                                                    if node.interactivity.js_interactive {
-                                                        js_node_events
-                                                            .push((hitbox.node_id, "click"));
-                                                    }
-                                                }
+                                            if let Some(target) = js_target {
+                                                mouse_events.push(AppEvent::Click(MouseEventData {
+                                                    window_id: wid,
+                                                    node_id: target,
+                                                    x, y,
+                                                    screen_x: x, screen_y: y,
+                                                    button: button_num,
+                                                    buttons,
+                                                }));
                                             }
                                         }
                                     }
@@ -879,38 +933,60 @@ impl ApplicationHandler<UserEvent> for Application {
                             }
                         }
                     }
+
+                    state.pending_events.extend(mouse_events);
                 }
                 WindowEvent::KeyboardInput {
                     event: key_event, ..
                 } => {
                     use winit::event::ElementState;
-                    use winit::keyboard::{Key, NamedKey};
+                    use winit::keyboard::{Key, NamedKey, PhysicalKey};
 
-                    if key_event.state == ElementState::Pressed {
-                        if key_event.logical_key == Key::Named(NamedKey::F5) {
-                            state.pending_events.push(AppEvent::HotReload);
-                        } else {
-                            let key_str = match &key_event.logical_key {
-                                Key::Character(c) => c.to_string(),
-                                Key::Named(named) => format!("{:?}", named),
-                                _ => return,
-                            };
-                            state.pending_events.push(AppEvent::KeyDown(KeyEventData {
-                                window_id: wid,
-                                key: key_str,
-                            }));
-                        }
-                    } else {
-                        let key_str = match &key_event.logical_key {
-                            Key::Character(c) => c.to_string(),
-                            Key::Named(named) => format!("{:?}", named),
-                            _ => return,
-                        };
-                        state.pending_events.push(AppEvent::KeyUp(KeyEventData {
-                            window_id: wid,
-                            key: key_str,
-                        }));
+                    // F5 → hot reload (keep existing behavior)
+                    if key_event.state == ElementState::Pressed
+                        && key_event.logical_key == Key::Named(NamedKey::F5)
+                    {
+                        state.pending_events.push(AppEvent::HotReload);
+                        return;
                     }
+
+                    let key_str = match &key_event.logical_key {
+                        Key::Character(c) => c.to_string(),
+                        Key::Named(named) => format!("{:?}", named),
+                        _ => return,
+                    };
+
+                    let code_str = match key_event.physical_key {
+                        PhysicalKey::Code(kc) => format!("{:?}", kc),
+                        _ => String::new(),
+                    };
+
+                    let data = KeyEventData {
+                        window_id: wid,
+                        key: key_str,
+                        code: code_str,
+                        key_code: 0, // legacy field, not mapped
+                        modifiers: state.modifiers,
+                        repeat: key_event.repeat,
+                    };
+
+                    match key_event.state {
+                        ElementState::Pressed => {
+                            state.pending_events.push(AppEvent::KeyDown(data));
+                        }
+                        ElementState::Released => {
+                            state.pending_events.push(AppEvent::KeyUp(data));
+                        }
+                    }
+                }
+                WindowEvent::ModifiersChanged(mods) => {
+                    let m = mods.state();
+                    let mut bits: u32 = 0;
+                    if m.control_key() { bits |= 1; }
+                    if m.alt_key() { bits |= 2; }
+                    if m.shift_key() { bits |= 4; }
+                    if m.super_key() { bits |= 8; }
+                    state.modifiers = bits;
                 }
                 WindowEvent::CursorLeft { .. } => {
                     if let Some(entry) = state.windows.get_mut(&wid) {
@@ -927,26 +1003,6 @@ impl ApplicationHandler<UserEvent> for Application {
                     }
                 }
                 _ => {}
-            }
-
-            // Push JS node events
-            for (node_id, event_kind) in js_node_events {
-                let event = match event_kind {
-                    "click" => AppEvent::Click(NodeEventData {
-                        window_id: wid,
-                        node_id,
-                    }),
-                    "mousedown" => AppEvent::MouseDown(NodeEventData {
-                        window_id: wid,
-                        node_id,
-                    }),
-                    "mouseup" => AppEvent::MouseUp(NodeEventData {
-                        window_id: wid,
-                        node_id,
-                    }),
-                    _ => continue,
-                };
-                state.pending_events.push(event);
             }
 
             if needs_redraw {

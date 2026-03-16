@@ -4,6 +4,7 @@ import type { JSX } from './jsx/runtime';
 import type { Window } from '..';
 import * as core from '../bindings';
 import { PropKey } from '../bindings';
+import { eventManager } from '../events';
 
 // ── Prop key mapping ─────────────────────────────────────────────────
 
@@ -134,31 +135,8 @@ function clearProp(windowId: number, nodeId: any, propName: string): void {
   }
 }
 
-// ── Event registry ───────────────────────────────────────────────────
-
-function nodeKey(nodeId: any): string {
-  return JSON.stringify(nodeId);
-}
-
-const eventRegistry = new Map<string, Map<string, Function>>();
-
-export function registerEvent(nodeId: any, eventType: string, cb: Function) {
-  const key = nodeKey(nodeId);
-  if (!eventRegistry.has(key)) eventRegistry.set(key, new Map());
-  eventRegistry.get(key)!.set(eventType, cb);
-}
-
-export function unregisterEvents(nodeId: any) {
-  eventRegistry.delete(nodeKey(nodeId));
-}
-
-export function dispatchEvent(
-  nodeId: any,
-  eventType: string,
-  payload?: unknown,
-) {
-  eventRegistry.get(nodeKey(nodeId))?.get(eventType)?.(payload);
-}
+// ── Event registry (delegated to EventManager) ──────────────────────
+export { eventManager } from '../events';
 
 // ── UElement ─────────────────────────────────────────────────────────
 
@@ -169,6 +147,7 @@ class UElement {
   styles: Record<string, any> = {};
   eventListeners: Map<string, Function> = new Map();
   children: UElement[] = [];
+  parent: UElement | null = null;
 
   constructor(
     id: any,
@@ -272,7 +251,7 @@ const reconciler = ReactReconciler<
       if (el.eventListeners.size > 0) {
         core.setF32Prop(windowId, id, PropKey.Interactive, 1);
         for (const [event, cb] of el.eventListeners) {
-          registerEvent(id, event, cb);
+          eventManager.addHandlerByName(id, event, cb);
         }
       }
 
@@ -290,7 +269,7 @@ const reconciler = ReactReconciler<
     if (el.eventListeners.size > 0) {
       core.setF32Prop(windowId, id, PropKey.Interactive, 1);
       for (const [event, cb] of el.eventListeners) {
-        registerEvent(id, event, cb);
+        eventManager.addHandlerByName(id, event, cb);
       }
     }
 
@@ -309,6 +288,8 @@ const reconciler = ReactReconciler<
 
   appendInitialChild(parent, child) {
     parent.children.push(child);
+    child.parent = parent;
+    eventManager.setParent(child.id, parent.id);
     core.appendChild(parent.windowId, parent.id, child.id);
   },
 
@@ -318,11 +299,15 @@ const reconciler = ReactReconciler<
 
   appendChildToContainer(container, child) {
     const windowId = getWindowId(container);
+    child.parent = null;
+    eventManager.setParent(child.id, container.rootNodeId);
     core.appendChild(windowId, container.rootNodeId, child.id);
   },
 
   appendChild(parent, child) {
     parent.children.push(child);
+    child.parent = parent;
+    eventManager.setParent(child.id, parent.id);
     core.appendChild(parent.windowId, parent.id, child.id);
   },
 
@@ -333,25 +318,31 @@ const reconciler = ReactReconciler<
     } else {
       parent.children.push(child);
     }
+    child.parent = parent;
+    eventManager.setParent(child.id, parent.id);
     core.insertBefore(parent.windowId, parent.id, child.id, before.id);
   },
 
   insertInContainerBefore(container, child, before) {
     const windowId = getWindowId(container);
+    child.parent = null;
+    eventManager.setParent(child.id, container.rootNodeId);
     core.insertBefore(windowId, container.rootNodeId, child.id, before.id);
   },
 
   removeChild(parent, child) {
     const idx = parent.children.indexOf(child);
     if (idx >= 0) parent.children.splice(idx, 1);
+    child.parent = null;
     core.removeChild(parent.windowId, parent.id, child.id);
-    unregisterEvents(child.id);
+    eventManager.clearNode(child.id);
   },
 
   removeChildFromContainer(container, child) {
     const windowId = getWindowId(container);
+    child.parent = null;
     core.removeChild(windowId, container.rootNodeId, child.id);
-    unregisterEvents(child.id);
+    eventManager.clearNode(child.id);
   },
 
   commitUpdate(instance, type, oldProps, newProps, _internalHandle) {
@@ -394,12 +385,16 @@ const reconciler = ReactReconciler<
     instance.styles = newStyles;
 
     // Diff event listeners
-    for (const [event, cb] of newEventListeners) {
-      registerEvent(instance.id, event, cb);
+    for (const [event, newCb] of newEventListeners) {
+      const oldCb = instance.eventListeners.get(event);
+      if (oldCb !== newCb) {
+        if (oldCb) eventManager.removeHandlerByName(instance.id, event, oldCb);
+        eventManager.addHandlerByName(instance.id, event, newCb);
+      }
     }
-    for (const [event] of instance.eventListeners) {
+    for (const [event, cb] of instance.eventListeners) {
       if (!newEventListeners.has(event)) {
-        eventRegistry.get(nodeKey(instance.id))?.delete(event);
+        eventManager.removeHandlerByName(instance.id, event, cb);
       }
     }
     if (newEventListeners.size > 0 && instance.eventListeners.size === 0) {
@@ -429,7 +424,7 @@ const reconciler = ReactReconciler<
   },
 
   detachDeletedInstance(instance) {
-    unregisterEvents(instance.id);
+    eventManager.clearNode(instance.id);
     instance.eventListeners.clear();
   },
 
@@ -541,5 +536,5 @@ export function disposeAllRoots() {
 }
 
 export function clearEventRegistry() {
-  eventRegistry.clear();
+  eventManager.clear();
 }

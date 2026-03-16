@@ -1,6 +1,6 @@
 import { Application, createWindow, pollEvents, resetDom, setRemBase } from './bindings';
-import { dispatchEvent } from './react/reconciler';
 import { requestQuit } from './bindings';
+import { eventManager, EventType } from './events';
 
 export interface WindowAttributes {
   width: number;
@@ -72,6 +72,8 @@ export class Window {
 }
 
 export { render } from './react';
+export { eventManager, EventType } from './events';
+export type { UzumakiEvent, UzumakiMouseEvent, UzumakiKeyboardEvent } from './events';
 
 interface AppEvent {
   type: string;
@@ -121,19 +123,28 @@ export async function runApp({
     const events: AppEvent[] = pollEvents();
     for (const event of events) {
       switch (event.type) {
-        case 'click':
         case 'mouseDown':
+          if (event.nodeId != null) {
+            eventManager.onRawEvent(EventType.MouseDown, event.nodeId, event);
+          }
+          break;
         case 'mouseUp':
           if (event.nodeId != null) {
-            dispatchEvent(event.nodeId, event.type);
+            eventManager.onRawEvent(EventType.MouseUp, event.nodeId, event);
+          }
+          break;
+        case 'click':
+          if (event.nodeId != null) {
+            eventManager.onRawEvent(EventType.Click, event.nodeId, event);
           }
           break;
         case 'keyDown':
+          eventManager.onRawEvent(EventType.KeyDown, null, event);
+          break;
         case 'keyUp':
-          // TODO: dispatch to focused element or global handler
+          eventManager.onRawEvent(EventType.KeyUp, null, event);
           break;
         case 'resize':
-          // TODO: dispatch resize if needed
           break;
         case 'hotReload':
           console.log('[uzumaki] Hot reload triggered');
