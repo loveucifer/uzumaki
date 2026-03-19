@@ -50,6 +50,9 @@ pub enum KeyResult {
     Blur,
     Handled,
     Ignored,
+    /// Multiline vertical navigation: direction -1=up, +1=down; extend=shift held.
+    /// The caller must resolve the target grapheme using the text renderer and call `move_to`.
+    VerticalNav { direction: i32, extend: bool },
 }
 
 // ── InputState ───────────────────────────────────────────────────────
@@ -243,6 +246,31 @@ impl InputState {
     }
 
     pub fn move_home(&mut self, extend: bool) {
+        if self.multiline {
+            self.move_line_start(extend);
+        } else {
+            self.selection.active = 0;
+            if !extend {
+                self.selection.anchor = 0;
+            }
+            self.reset_blink();
+        }
+    }
+
+    pub fn move_end(&mut self, extend: bool) {
+        if self.multiline {
+            self.move_line_end(extend);
+        } else {
+            let count = self.grapheme_count();
+            self.selection.active = count;
+            if !extend {
+                self.selection.anchor = count;
+            }
+            self.reset_blink();
+        }
+    }
+
+    pub fn move_absolute_home(&mut self, extend: bool) {
         self.selection.active = 0;
         if !extend {
             self.selection.anchor = 0;
@@ -250,13 +278,163 @@ impl InputState {
         self.reset_blink();
     }
 
-    pub fn move_end(&mut self, extend: bool) {
+    pub fn move_absolute_end(&mut self, extend: bool) {
         let count = self.grapheme_count();
         self.selection.active = count;
         if !extend {
             self.selection.anchor = count;
         }
         self.reset_blink();
+    }
+
+    /// Move cursor to start of current line (bounded by \n or start of text).
+    pub fn move_line_start(&mut self, extend: bool) {
+        let graphemes: Vec<&str> = self.text.graphemes(true).collect();
+        let mut pos = self.selection.active;
+        while pos > 0 && graphemes[pos - 1] != "\n" {
+            pos -= 1;
+        }
+        self.selection.active = pos;
+        if !extend {
+            self.selection.anchor = pos;
+        }
+        self.reset_blink();
+    }
+
+    /// Move cursor to end of current line (bounded by \n or end of text).
+    pub fn move_line_end(&mut self, extend: bool) {
+        let graphemes: Vec<&str> = self.text.graphemes(true).collect();
+        let count = graphemes.len();
+        let mut pos = self.selection.active;
+        while pos < count && graphemes[pos] != "\n" {
+            pos += 1;
+        }
+        self.selection.active = pos;
+        if !extend {
+            self.selection.anchor = pos;
+        }
+        self.reset_blink();
+    }
+
+    /// Move cursor to a specific grapheme index (used by caller for vertical nav).
+    pub fn move_to(&mut self, pos: usize, extend: bool) {
+        let count = self.grapheme_count();
+        self.selection.active = pos.min(count);
+        if !extend {
+            self.selection.anchor = self.selection.active;
+        }
+        self.reset_blink();
+    }
+
+    pub fn move_word_left(&mut self, extend: bool) {
+        let graphemes: Vec<&str> = self.text.graphemes(true).collect();
+        let mut pos = self.selection.active;
+        // Skip whitespace
+        while pos > 0 && graphemes[pos - 1].chars().all(char::is_whitespace) {
+            pos -= 1;
+        }
+        // Skip word chars
+        while pos > 0 && !graphemes[pos - 1].chars().all(char::is_whitespace) {
+            pos -= 1;
+        }
+        self.selection.active = pos;
+        if !extend {
+            self.selection.anchor = pos;
+        }
+        self.reset_blink();
+    }
+
+    pub fn move_word_right(&mut self, extend: bool) {
+        let graphemes: Vec<&str> = self.text.graphemes(true).collect();
+        let count = graphemes.len();
+        let mut pos = self.selection.active;
+        // Skip word chars
+        while pos < count && !graphemes[pos].chars().all(char::is_whitespace) {
+            pos += 1;
+        }
+        // Skip whitespace
+        while pos < count && graphemes[pos].chars().all(char::is_whitespace) {
+            pos += 1;
+        }
+        self.selection.active = pos;
+        if !extend {
+            self.selection.anchor = pos;
+        }
+        self.reset_blink();
+    }
+
+    pub fn delete_word_backward(&mut self) -> Option<InputEdit> {
+        if self.disabled {
+            return None;
+        }
+        if !self.selection.is_collapsed() {
+            self.delete_selection();
+            self.reset_blink();
+            return Some(InputEdit {
+                input_type: "deleteWordBackward",
+                data: None,
+            });
+        }
+        if self.selection.active == 0 {
+            return None;
+        }
+        let end = self.selection.active;
+        let graphemes: Vec<&str> = self.text.graphemes(true).collect();
+        let mut pos = end;
+        // Skip whitespace
+        while pos > 0 && graphemes[pos - 1].chars().all(char::is_whitespace) {
+            pos -= 1;
+        }
+        // Skip word chars
+        while pos > 0 && !graphemes[pos - 1].chars().all(char::is_whitespace) {
+            pos -= 1;
+        }
+        let byte_start = self.grapheme_to_byte(pos);
+        let byte_end = self.grapheme_to_byte(end);
+        self.text.replace_range(byte_start..byte_end, "");
+        self.selection.set_cursor(pos);
+        self.reset_blink();
+        Some(InputEdit {
+            input_type: "deleteWordBackward",
+            data: None,
+        })
+    }
+
+    pub fn delete_word_forward(&mut self) -> Option<InputEdit> {
+        if self.disabled {
+            return None;
+        }
+        if !self.selection.is_collapsed() {
+            self.delete_selection();
+            self.reset_blink();
+            return Some(InputEdit {
+                input_type: "deleteWordForward",
+                data: None,
+            });
+        }
+        let count = self.grapheme_count();
+        if self.selection.active >= count {
+            return None;
+        }
+        let start = self.selection.active;
+        let graphemes: Vec<&str> = self.text.graphemes(true).collect();
+        let mut pos = start;
+        // Skip word chars
+        while pos < count && !graphemes[pos].chars().all(char::is_whitespace) {
+            pos += 1;
+        }
+        // Skip whitespace
+        while pos < count && graphemes[pos].chars().all(char::is_whitespace) {
+            pos += 1;
+        }
+        let byte_start = self.grapheme_to_byte(start);
+        let byte_end = self.grapheme_to_byte(pos);
+        self.text.replace_range(byte_start..byte_end, "");
+        self.reset_blink();
+        Some(InputEdit {
+            input_type: "deleteWordForward",
+            data: None,
+        })
     }
 
     pub fn select_all(&mut self) {
@@ -333,28 +511,80 @@ impl InputState {
                 }
             }
             Key::Named(named) => match named {
-                NamedKey::Backspace => match self.backspace() {
-                    Some(edit) => KeyResult::Edit(edit),
-                    None => KeyResult::Handled,
-                },
-                NamedKey::Delete => match self.delete() {
-                    Some(edit) => KeyResult::Edit(edit),
-                    None => KeyResult::Handled,
-                },
+                NamedKey::Backspace => {
+                    if ctrl {
+                        match self.delete_word_backward() {
+                            Some(edit) => KeyResult::Edit(edit),
+                            None => KeyResult::Handled,
+                        }
+                    } else {
+                        match self.backspace() {
+                            Some(edit) => KeyResult::Edit(edit),
+                            None => KeyResult::Handled,
+                        }
+                    }
+                }
+                NamedKey::Delete => {
+                    if ctrl {
+                        match self.delete_word_forward() {
+                            Some(edit) => KeyResult::Edit(edit),
+                            None => KeyResult::Handled,
+                        }
+                    } else {
+                        match self.delete() {
+                            Some(edit) => KeyResult::Edit(edit),
+                            None => KeyResult::Handled,
+                        }
+                    }
+                }
                 NamedKey::ArrowLeft => {
-                    self.move_left(shift);
+                    if ctrl {
+                        self.move_word_left(shift);
+                    } else {
+                        self.move_left(shift);
+                    }
                     KeyResult::Handled
                 }
                 NamedKey::ArrowRight => {
-                    self.move_right(shift);
+                    if ctrl {
+                        self.move_word_right(shift);
+                    } else {
+                        self.move_right(shift);
+                    }
                     KeyResult::Handled
                 }
+                NamedKey::ArrowUp => {
+                    if self.multiline {
+                        KeyResult::VerticalNav { direction: -1, extend: shift }
+                    } else {
+                        // Single-line: up goes to start
+                        self.move_home(shift);
+                        KeyResult::Handled
+                    }
+                }
+                NamedKey::ArrowDown => {
+                    if self.multiline {
+                        KeyResult::VerticalNav { direction: 1, extend: shift }
+                    } else {
+                        // Single-line: down goes to end
+                        self.move_end(shift);
+                        KeyResult::Handled
+                    }
+                }
                 NamedKey::Home => {
-                    self.move_home(shift);
+                    if ctrl {
+                        self.move_absolute_home(shift);
+                    } else {
+                        self.move_home(shift);
+                    }
                     KeyResult::Handled
                 }
                 NamedKey::End => {
-                    self.move_end(shift);
+                    if ctrl {
+                        self.move_absolute_end(shift);
+                    } else {
+                        self.move_end(shift);
+                    }
                     KeyResult::Handled
                 }
                 NamedKey::Space => match self.insert_text(" ") {
@@ -365,6 +595,16 @@ impl InputState {
                 NamedKey::Enter => {
                     if self.multiline {
                         match self.insert_text("\n") {
+                            Some(edit) => KeyResult::Edit(edit),
+                            None => KeyResult::Handled,
+                        }
+                    } else {
+                        KeyResult::Ignored
+                    }
+                }
+                NamedKey::Tab => {
+                    if self.multiline {
+                        match self.insert_text("    ") {
                             Some(edit) => KeyResult::Edit(edit),
                             None => KeyResult::Handled,
                         }

@@ -1338,6 +1338,53 @@ impl ApplicationHandler<UserEvent> for Application {
                                                 needs_redraw = true;
                                                 handled_by_input = true;
                                             }
+                                            KeyResult::VerticalNav { direction, extend } => {
+                                                // Gather info needed for vertical navigation
+                                                let display_text = input_state.display_text();
+                                                let font_size = node.style.text.font_size;
+                                                let cursor_pos = input_state.selection.active;
+                                                let padding = node.style.padding.left;
+                                                let input_padding = if padding > 0.0 { padding } else { 8.0 };
+                                                let taffy_node = node.taffy_node;
+
+                                                let wrap_width = entry.dom.taffy.layout(taffy_node)
+                                                    .map(|l| l.size.width as f32 - input_padding * 2.0)
+                                                    .unwrap_or(200.0);
+
+                                                if let Some(handle) = &mut entry.handle {
+                                                    let positions = handle.text_renderer.grapheme_positions_2d(
+                                                        &display_text,
+                                                        font_size,
+                                                        Some(wrap_width),
+                                                    );
+
+                                                    let line_height = font_size * 1.2;
+                                                    let cur_pos = if cursor_pos < positions.len() {
+                                                        &positions[cursor_pos]
+                                                    } else {
+                                                        positions.last().unwrap()
+                                                    };
+                                                    let target_x = cur_pos.x;
+                                                    let target_y = cur_pos.y + direction as f32 * line_height;
+
+                                                    let target_idx = handle.text_renderer.hit_to_grapheme_2d(
+                                                        &display_text,
+                                                        font_size,
+                                                        Some(wrap_width),
+                                                        target_x,
+                                                        target_y,
+                                                    );
+
+                                                    // Update cursor via move_to on the input state
+                                                    if let Some(node) = entry.dom.nodes.get_mut(focused_id) {
+                                                        if let Some(is) = &mut node.input_state {
+                                                            is.move_to(target_idx, extend);
+                                                        }
+                                                    }
+                                                }
+                                                needs_redraw = true;
+                                                handled_by_input = true;
+                                            }
                                             KeyResult::Ignored => {}
                                         }
                                     }

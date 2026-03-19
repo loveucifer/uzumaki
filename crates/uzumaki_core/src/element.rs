@@ -716,8 +716,9 @@ fn paint_input(
                 scale,
             );
         } else if !is_empty {
-            // Draw selection highlight (multi-line aware)
-            if input.sel_start != input.sel_end
+            // Draw selection highlight (multi-line aware, only when focused)
+            if input.focused
+                && input.sel_start != input.sel_end
                 && input.sel_start < positions.len()
                 && input.sel_end <= positions.len()
             {
@@ -814,8 +815,9 @@ fn paint_input(
                 scale,
             );
         } else if !is_empty {
-            // Draw selection highlight
-            if input.sel_start != input.sel_end
+            // Draw selection highlight (only when focused)
+            if input.focused
+                && input.sel_start != input.sel_end
                 && input.sel_start < positions.len()
                 && input.sel_end <= positions.len()
             {
