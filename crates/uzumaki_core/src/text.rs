@@ -214,7 +214,7 @@ impl TextRenderer {
             }
         }
 
-        let line_height = (font_size * 1.2).round(); // match cosmic-text Metrics
+        let line_height = (font_size * 1.2).round();
         let mut first_line_top: Option<f32> = None;
         let mut last_line_top: f32 = 0.0;
 
@@ -228,7 +228,6 @@ impl TextRenderer {
             }
 
             if run.glyphs.is_empty() {
-                // Empty line (e.g. after \n) — use line_i to find byte offset
                 let line_idx = run.line_i;
                 let byte_off = line_starts.get(line_idx).copied().unwrap_or(text.len());
                 byte_pos.push((byte_off, 0.0, line_top));
@@ -242,12 +241,10 @@ impl TextRenderer {
 
         let first_y = first_line_top.unwrap_or(0.0);
 
-        // Ensure byte 0 is in the map (safety net for text starting with non-printable chars)
         if !byte_pos.iter().any(|&(off, _, _)| off == 0) {
             byte_pos.push((0, 0.0, first_y));
         }
 
-        // Ensure trailing newline has a position on the next line
         if text.ends_with('\n') {
             let end_byte = text.len();
             if !byte_pos.iter().any(|&(off, _, _)| off == end_byte) {
@@ -255,20 +252,29 @@ impl TextRenderer {
             }
         }
 
-        // Ensure text.len() is always in the map
         if !byte_pos.iter().any(|&(off, _, _)| off == text.len()) {
-            let last = byte_pos.last().map(|&(_, x, y)| (x, y)).unwrap_or((0.0, first_y));
+            let last = byte_pos
+                .last()
+                .map(|&(_, x, y)| (x, y))
+                .unwrap_or((0.0, first_y));
             byte_pos.push((text.len(), last.0, last.1));
         }
 
-        // Sort by byte offset, then by y descending so that at soft-wrap boundaries
-        // (where two entries share the same byte offset on different lines), the
-        // start-of-next-line entry comes first and is kept by dedup.
+        // Sort by byte offset, then y ascending. Do NOT dedup — at wrap
+        // boundaries the same byte offset appears on two lines and we need both.
         byte_pos.sort_by(|a, b| {
             a.0.cmp(&b.0)
-                .then(b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal))
+                .then(a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal))
         });
-        byte_pos.dedup_by_key(|entry| entry.0);
+
+        // Build a set of byte offsets immediately after a \n character.
+        // At these offsets we want the next-line position (higher y).
+        // At soft-wrap boundaries we want the current-line position (lower y).
+        let newline_bytes: std::collections::HashSet<usize> = text
+            .char_indices()
+            .filter(|&(_, ch)| ch == '\n')
+            .map(|(i, ch)| i + ch.len_utf8())
+            .collect();
 
         // Map grapheme boundaries to (x, y)
         let mut positions = Vec::new();
@@ -277,7 +283,8 @@ impl TextRenderer {
         let mut byte_offset = 0;
         for grapheme in text.graphemes(true) {
             byte_offset += grapheme.len();
-            positions.push(lookup_byte_pos_2d(&byte_pos, byte_offset));
+            let after_newline = newline_bytes.contains(&byte_offset);
+            positions.push(lookup_byte_pos_2d(&byte_pos, byte_offset, after_newline));
         }
 
         positions
@@ -298,7 +305,10 @@ impl TextRenderer {
         // Collect unique line y values
         let mut line_ys: Vec<f32> = Vec::new();
         for pos in &positions {
-            if line_ys.last().map_or(true, |&last| (pos.y - last).abs() > 1.0) {
+            if line_ys
+                .last()
+                .map_or(true, |&last| (pos.y - last).abs() > 1.0)
+            {
                 line_ys.push(pos.y);
             }
         }
@@ -360,39 +370,54 @@ impl TextRenderer {
     }
 }
 
-fn lookup_byte_pos_2d(byte_pos: &[(usize, f32, f32)], byte_offset: usize) -> GlyphPos2D {
-    match byte_pos.binary_search_by_key(&byte_offset, |&(off, _, _)| off) {
-        Ok(idx) => GlyphPos2D {
+/// Look up a byte offset in the (sorted, non-deduped) position list.
+/// `prefer_next_line`: when true (after \n), pick the entry with highest y at this offset;
+/// when false (soft-wrap), pick the entry with lowest y (end of current line).
+fn lookup_byte_pos_2d(
+    byte_pos: &[(usize, f32, f32)],
+    byte_offset: usize,
+    prefer_next_line: bool,
+) -> GlyphPos2D {
+    // Find range of entries matching this byte offset (array is sorted by offset then y).
+    let start = byte_pos.partition_point(|&(off, _, _)| off < byte_offset);
+    let end = byte_pos.partition_point(|&(off, _, _)| off <= byte_offset);
+
+    if start < end {
+        // One or more entries match. Since sorted by y ascending:
+        // - lowest y (current line end) is at `start`
+        // - highest y (next line start) is at `end - 1`
+        let idx = if prefer_next_line { end - 1 } else { start };
+        return GlyphPos2D {
             x: byte_pos[idx].1,
             y: byte_pos[idx].2,
-        },
-        Err(idx) => {
-            if idx == 0 {
-                GlyphPos2D { x: 0.0, y: 0.0 }
-            } else if idx >= byte_pos.len() {
-                byte_pos
-                    .last()
-                    .map(|&(_, x, y)| GlyphPos2D { x, y })
-                    .unwrap_or(GlyphPos2D { x: 0.0, y: 0.0 })
+        };
+    }
+
+    // No exact match — interpolate between neighbors
+    if start == 0 {
+        GlyphPos2D { x: 0.0, y: 0.0 }
+    } else if start >= byte_pos.len() {
+        byte_pos
+            .last()
+            .map(|&(_, x, y)| GlyphPos2D { x, y })
+            .unwrap_or(GlyphPos2D { x: 0.0, y: 0.0 })
+    } else {
+        let (off0, x0, y0) = byte_pos[start - 1];
+        let (off1, x1, y1) = byte_pos[start];
+        if (y0 - y1).abs() > 1.0 {
+            // Cross-line: snap to nearest entry
+            let d0 = byte_offset - off0;
+            let d1 = off1 - byte_offset;
+            if d0 <= d1 {
+                GlyphPos2D { x: x0, y: y0 }
             } else {
-                let (off0, x0, y0) = byte_pos[idx - 1];
-                let (off1, x1, y1) = byte_pos[idx];
-                // If on different lines (line break), snap to nearest entry
-                if (y0 - y1).abs() > 1.0 {
-                    let d0 = byte_offset - off0;
-                    let d1 = off1 - byte_offset;
-                    if d0 <= d1 {
-                        GlyphPos2D { x: x0, y: y0 }
-                    } else {
-                        GlyphPos2D { x: x1, y: y1 }
-                    }
-                } else {
-                    let t = (byte_offset - off0) as f32 / (off1 - off0).max(1) as f32;
-                    GlyphPos2D {
-                        x: x0 + t * (x1 - x0),
-                        y: y0,
-                    }
-                }
+                GlyphPos2D { x: x1, y: y1 }
+            }
+        } else {
+            let t = (byte_offset - off0) as f32 / (off1 - off0).max(1) as f32;
+            GlyphPos2D {
+                x: x0 + t * (x1 - x0),
+                y: y0,
             }
         }
     }

@@ -90,8 +90,6 @@ impl Bounds {
     }
 }
 
-// ── Edge / Corner types ──────────────────────────────────────────────
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Refineable)]
 #[refineable(Debug)]
 pub struct Edges {
@@ -397,8 +395,6 @@ impl Default for Style {
         }
     }
 }
-
-// ── Style → taffy conversion ─────────────────────────────────────────
 
 impl Style {
     pub fn to_taffy(&self) -> taffy::Style {

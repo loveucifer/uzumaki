@@ -55,6 +55,7 @@ pub enum KeyResult {
 }
 
 pub struct InputState {
+    // ig string is enough for now
     pub text: String,
     pub placeholder: String,
     pub selection: Selection,
@@ -96,6 +97,7 @@ impl InputState {
     fn grapheme_to_byte(&self, idx: usize) -> usize {
         self.text
             .grapheme_indices(true)
+            // todo cache
             .nth(idx)
             .map(|(i, _)| i)
             .unwrap_or(self.text.len())
@@ -154,6 +156,7 @@ impl InputState {
         if self.disabled {
             return None;
         }
+
         if let Some(max) = self.max_length {
             let current = self.grapheme_count() - (self.selection.end() - self.selection.start());
             let insert = ch.graphemes(true).count();
@@ -161,6 +164,7 @@ impl InputState {
                 return None;
             }
         }
+
         self.delete_selection();
         let byte_pos = self.grapheme_to_byte(self.selection.active);
         self.text.insert_str(byte_pos, ch);
@@ -260,29 +264,16 @@ impl InputState {
 
     pub fn move_home(&mut self, extend: bool) {
         self.sticky_x = None;
-        if self.multiline {
-            self.move_line_start(extend);
-        } else {
-            self.selection.active = 0;
-            if !extend {
-                self.selection.anchor = 0;
-            }
-            self.reset_blink();
-        }
+        // move_line_start handles both single-line and multiline correctly:
+        // no \n in single-line text means it goes to position 0.
+        self.move_line_start(extend);
     }
 
     pub fn move_end(&mut self, extend: bool) {
         self.sticky_x = None;
-        if self.multiline {
-            self.move_line_end(extend);
-        } else {
-            let count = self.grapheme_count();
-            self.selection.active = count;
-            if !extend {
-                self.selection.anchor = count;
-            }
-            self.reset_blink();
-        }
+        // move_line_end handles both single-line and multiline correctly:
+        // no \n in single-line text means it goes to the end.
+        self.move_line_end(extend);
     }
 
     pub fn move_absolute_home(&mut self, extend: bool) {
@@ -579,27 +570,18 @@ impl InputState {
                     KeyResult::Handled
                 }
                 NamedKey::ArrowUp => {
-                    if self.multiline {
-                        KeyResult::VerticalNav {
-                            direction: -1,
-                            extend: shift,
-                        }
-                    } else {
-                        // Single-line: up goes to start
-                        self.move_home(shift);
-                        KeyResult::Handled
+                    // Always delegate to caller for vertical navigation.
+                    // Single-line: caller finds no other line → snaps to start.
+                    // Multiline: caller resolves target line via text renderer.
+                    KeyResult::VerticalNav {
+                        direction: -1,
+                        extend: shift,
                     }
                 }
                 NamedKey::ArrowDown => {
-                    if self.multiline {
-                        KeyResult::VerticalNav {
-                            direction: 1,
-                            extend: shift,
-                        }
-                    } else {
-                        // Single-line: down goes to end
-                        self.move_end(shift);
-                        KeyResult::Handled
+                    KeyResult::VerticalNav {
+                        direction: 1,
+                        extend: shift,
                     }
                 }
                 NamedKey::Home => {
