@@ -6,8 +6,6 @@ import { PropKey } from '../bindings';
 import { eventManager } from '../events';
 import { Window } from '../window';
 
-// ── Prop name → native key mapping ──────────────────────────────────
-
 const PROP_NAME_TO_KEY: Record<string, number> = {
   w: PropKey.W,
   h: PropKey.H,
@@ -139,22 +137,35 @@ function toEnumValue(key: number, value: any): number {
       return FLEX_DIR_MAP[s] ?? 0;
     case PropKey.Items:
       return (
-        ({
-          'flex-start': 0, start: 0,
-          'flex-end': 1, end: 1,
-          center: 2, stretch: 3, baseline: 4,
-        } as any)[s] ?? 3
+        (
+          {
+            'flex-start': 0,
+            start: 0,
+            'flex-end': 1,
+            end: 1,
+            center: 2,
+            stretch: 3,
+            baseline: 4,
+          } as any
+        )[s] ?? 3
       );
     case PropKey.Justify:
       return (
-        ({
-          'flex-start': 0, start: 0,
-          'flex-end': 1, end: 1,
-          center: 2,
-          'space-between': 3, between: 3,
-          'space-around': 4, around: 4,
-          'space-evenly': 5, evenly: 5,
-        } as any)[s] ?? 0
+        (
+          {
+            'flex-start': 0,
+            start: 0,
+            'flex-end': 1,
+            end: 1,
+            center: 2,
+            'space-between': 3,
+            between: 3,
+            'space-around': 4,
+            around: 4,
+            'space-evenly': 5,
+            evenly: 5,
+          } as any
+        )[s] ?? 0
       );
     case PropKey.Display:
       return ({ none: 0, flex: 1, block: 2 } as any)[s] ?? 1;
@@ -163,9 +174,12 @@ function toEnumValue(key: number, value: any): number {
   }
 }
 
-// ── Native prop setters ──────────────────────────────────────────────
-
-function setNativeProp(windowId: number, nodeId: any, propName: string, value: any): void {
+function setNativeProp(
+  windowId: number,
+  nodeId: any,
+  propName: string,
+  value: any,
+): void {
   if (propName === 'flex' && typeof value === 'string') {
     const dir = FLEX_DIR_MAP[value];
     if (dir !== undefined) {
@@ -197,14 +211,23 @@ function setNativeProp(windowId: number, nodeId: any, propName: string, value: a
   }
 }
 
-function clearNativeProp(windowId: number, nodeId: any, propName: string): void {
+function clearNativeProp(
+  windowId: number,
+  nodeId: any,
+  propName: string,
+): void {
   const key = PROP_NAME_TO_KEY[propName];
   if (key === undefined) return;
 
   if (LENGTH_KEYS.has(key)) {
     core.setLengthProp(windowId, nodeId, key, { value: 0, unit: 3 });
   } else if (COLOR_KEYS.has(key)) {
-    core.setColorProp(windowId, nodeId, key, { r: 255, g: 255, b: 255, a: 255 });
+    core.setColorProp(windowId, nodeId, key, {
+      r: 255,
+      g: 255,
+      b: 255,
+      a: 255,
+    });
   } else if (ENUM_KEYS.has(key)) {
     core.setEnumProp(windowId, nodeId, key, 0);
   } else {
@@ -213,7 +236,13 @@ function clearNativeProp(windowId: number, nodeId: any, propName: string): void 
 }
 
 function isEventProp(key: string): boolean {
-  return key.length >= 3 && key[0] === 'o' && key[1] === 'n' && key.charCodeAt(2) >= 65 && key.charCodeAt(2) <= 90;
+  return (
+    key.length >= 3 &&
+    key[0] === 'o' &&
+    key[1] === 'n' &&
+    key.charCodeAt(2) >= 65 &&
+    key.charCodeAt(2) <= 90
+  );
 }
 
 function eventPropToName(key: string): string {
@@ -338,7 +367,14 @@ class ViewElement extends BaseElement {
 
 import type { InputHandle } from './useInput';
 
-const INPUT_ATTR_NAMES = new Set(['value', 'placeholder', 'disabled', 'maxLength', 'multiline', 'secure']);
+const INPUT_ATTR_NAMES = new Set([
+  'value',
+  'placeholder',
+  'disabled',
+  'maxLength',
+  'multiline',
+  'secure',
+]);
 
 /** Input element: `<input>`. Has input-specific attributes (value, placeholder, etc.). */
 class InputElement extends BaseElement {
@@ -357,7 +393,13 @@ class InputElement extends BaseElement {
 
   private parseProps(props: Record<string, any>): void {
     for (const key in props) {
-      if (key === 'children' || key === 'key' || key === 'ref' || key === 'handle') continue;
+      if (
+        key === 'children' ||
+        key === 'key' ||
+        key === 'ref' ||
+        key === 'handle'
+      )
+        continue;
       const value = props[key];
       if (value == null) continue;
       if (isEventProp(key)) {
@@ -411,7 +453,13 @@ class InputElement extends BaseElement {
     const newEvents: Map<string, Function> = new Map();
 
     for (const key in newProps) {
-      if (key === 'children' || key === 'key' || key === 'ref' || key === 'handle') continue;
+      if (
+        key === 'children' ||
+        key === 'key' ||
+        key === 'ref' ||
+        key === 'handle'
+      )
+        continue;
       const value = newProps[key];
       if (value == null) continue;
       if (isEventProp(key)) {
@@ -451,7 +499,12 @@ class InputElement extends BaseElement {
     super.destroy();
   }
 
-  static setInputAttr(windowId: number, nodeId: any, key: string, value: any): void {
+  static setInputAttr(
+    windowId: number,
+    nodeId: any,
+    key: string,
+    value: any,
+  ): void {
     switch (key) {
       case 'value':
         core.setInputValue(windowId, nodeId, String(value ?? ''));
@@ -463,7 +516,11 @@ class InputElement extends BaseElement {
         core.setInputDisabled(windowId, nodeId, !!value);
         break;
       case 'maxLength':
-        core.setInputMaxLength(windowId, nodeId, typeof value === 'number' ? value : -1);
+        core.setInputMaxLength(
+          windowId,
+          nodeId,
+          typeof value === 'number' ? value : -1,
+        );
         break;
       case 'multiline':
         core.setInputMultiline(windowId, nodeId, !!value);
@@ -479,7 +536,12 @@ class InputElement extends BaseElement {
 class TextElement extends BaseElement {
   textContent: string;
 
-  constructor(windowId: number, type: string, text: string, props: Record<string, any>) {
+  constructor(
+    windowId: number,
+    type: string,
+    text: string,
+    props: Record<string, any>,
+  ) {
     const id = core.createTextNode(windowId, text);
     super(id, type, windowId);
     this.textContent = text;
@@ -508,7 +570,11 @@ class TextElement extends BaseElement {
     }
   }
 
-  commitUpdate(newProps: Record<string, any>, oldChildren: any, newChildren: any): void {
+  commitUpdate(
+    newProps: Record<string, any>,
+    oldChildren: any,
+    newChildren: any,
+  ): void {
     const newStyles: Record<string, any> = {};
     const newEvents: Map<string, Function> = new Map();
 
@@ -555,12 +621,21 @@ function isTextType(type: string): boolean {
   return type === 'text' || type === 'p';
 }
 
-function createElementInstance(type: string, props: Record<string, any>, windowId: number): BaseElement {
+function createElementInstance(
+  type: string,
+  props: Record<string, any>,
+  windowId: number,
+): BaseElement {
   if (type === 'input') {
     return new InputElement(windowId, props);
   }
   if (isTextType(type)) {
-    return new TextElement(windowId, type, getTextContent(props.children), props);
+    return new TextElement(
+      windowId,
+      type,
+      getTextContent(props.children),
+      props,
+    );
   }
   return new ViewElement(windowId, type, props);
 }

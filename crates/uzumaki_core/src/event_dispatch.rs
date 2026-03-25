@@ -71,8 +71,6 @@ pub enum AppEvent {
     HotReload,
 }
 
-// ── Redraw (scroll offset update + paint) ────────────────────────────
-
 pub fn handle_redraw(
     dom: &mut Dom,
     handle: &mut Window,
@@ -114,13 +112,20 @@ pub fn handle_redraw(
             let (input_width, input_height) = dom
                 .taffy
                 .layout(taffy_node)
-                .map(|l| (l.size.width as f32 - input_padding * 2.0, l.size.height as f32))
+                .map(|l| {
+                    (
+                        l.size.width as f32 - input_padding * 2.0,
+                        l.size.height as f32,
+                    )
+                })
                 .unwrap_or((200.0, 100.0));
 
             if is_multiline {
-                let positions = handle
-                    .text_renderer
-                    .grapheme_positions_2d(&display_text, font_size, Some(input_width));
+                let positions = handle.text_renderer.grapheme_positions_2d(
+                    &display_text,
+                    font_size,
+                    Some(input_width),
+                );
                 let cursor_y = if cursor_pos < positions.len() {
                     positions[cursor_pos].y
                 } else {
@@ -243,8 +248,7 @@ pub fn handle_cursor_moved(
                             .map(|l| l.size.width as f32 - input_padding as f32 * 2.0)
                             .unwrap_or(200.0);
                         let relative_x = (logical_x - hb.x - input_padding) as f32;
-                        let relative_y =
-                            (logical_y - hb.y) as f32 + scroll_offset_y - top_pad;
+                        let relative_y = (logical_y - hb.y) as f32 + scroll_offset_y - top_pad;
                         handle.text_renderer.hit_to_grapheme_2d(
                             &display_text,
                             font_size,
@@ -253,8 +257,7 @@ pub fn handle_cursor_moved(
                             relative_y,
                         )
                     } else {
-                        let relative_x =
-                            (logical_x - hb.x - input_padding) as f32 + scroll_offset;
+                        let relative_x = (logical_x - hb.x - input_padding) as f32 + scroll_offset;
                         handle
                             .text_renderer
                             .hit_to_grapheme(&display_text, font_size, relative_x)
@@ -476,8 +479,7 @@ pub fn handle_mouse_input(
                                     .map(|l| l.size.width as f32 - input_padding as f32 * 2.0)
                                     .unwrap_or(200.0);
                                 let relative_x = (mx - hb.x - input_padding) as f32;
-                                let relative_y =
-                                    (my - hb.y) as f32 + scroll_offset_y - top_pad;
+                                let relative_y = (my - hb.y) as f32 + scroll_offset_y - top_pad;
                                 handle.text_renderer.hit_to_grapheme_2d(
                                     &display_text,
                                     font_size,
@@ -486,8 +488,7 @@ pub fn handle_mouse_input(
                                     relative_y,
                                 )
                             } else {
-                                let relative_x =
-                                    (mx - hb.x - input_padding) as f32 + scroll_offset;
+                                let relative_x = (mx - hb.x - input_padding) as f32 + scroll_offset;
                                 handle.text_renderer.hit_to_grapheme(
                                     &display_text,
                                     font_size,
@@ -573,8 +574,7 @@ pub fn handle_mouse_input(
     (needs_redraw, events)
 }
 
-// ── Keyboard input ───────────────────────────────────────────────────
-
+// handles the keyboard input and returns if redraw is needed and events to dispatch (todo this is bad we should sync emit from js side)
 pub fn handle_keyboard_input(
     dom: &mut Dom,
     _handle: &mut Window,
@@ -582,6 +582,7 @@ pub fn handle_keyboard_input(
     key_event: &winit::event::KeyEvent,
     modifiers: u32,
 ) -> (bool, Vec<AppEvent>) {
+    // todo split this function TT
     use winit::event::ElementState;
     use winit::keyboard::PhysicalKey;
 
@@ -589,8 +590,8 @@ pub fn handle_keyboard_input(
     let mut events: Vec<AppEvent> = Vec::new();
 
     // F5 hot reload
-    if key_event.state == ElementState::Pressed
-        && key_event.logical_key == Key::Named(NamedKey::F5)
+    // todo we should do this after the event listners are done also enable only in dev
+    if key_event.state == ElementState::Pressed && key_event.logical_key == Key::Named(NamedKey::F5)
     {
         events.push(AppEvent::HotReload);
         return (needs_redraw, events);
@@ -598,21 +599,24 @@ pub fn handle_keyboard_input(
 
     // Route keyboard to focused input if present
     let mut handled_by_input = false;
+
     if key_event.state == ElementState::Pressed {
-        if let Some(focused_id) = dom.focused_node {
-            let shift = modifiers & 4 != 0;
+        let new_focus = dom
+            .with_focused_node(|node, focused_id| {
+                let mut new_focus = Some(focused_id);
 
-            // Handle ArrowUp/ArrowDown externally (vertical nav)
-            let is_vertical_nav = matches!(
-                key_event.logical_key,
-                Key::Named(NamedKey::ArrowUp) | Key::Named(NamedKey::ArrowDown)
-            );
+                let shift = modifiers & 4 != 0;
 
-            if is_vertical_nav {
-                let is_up = key_event.logical_key == Key::Named(NamedKey::ArrowUp);
-                let extend = shift;
+                // Handle ArrowUp/ArrowDown externally (vertical nav)
+                let is_vertical_nav = matches!(
+                    key_event.logical_key,
+                    Key::Named(NamedKey::ArrowUp) | Key::Named(NamedKey::ArrowDown)
+                );
 
-                if let Some(node) = dom.nodes.get_mut(focused_id) {
+                if is_vertical_nav {
+                    let is_up = key_event.logical_key == Key::Named(NamedKey::ArrowUp);
+                    let extend = shift;
+
                     if let Some(is) = node.behavior.as_input_mut() {
                         let (_, cur_col) = is.cursor_rowcol();
                         let sticky = is.sticky_col.unwrap_or(cur_col);
@@ -625,13 +629,11 @@ pub fn handle_keyboard_input(
                         is.sticky_x = None;
                         is.reset_blink();
                     }
-                }
 
-                needs_redraw = true;
-                handled_by_input = true;
-            } else {
-                // Non-vertical key: delegate to InputState::handle_key
-                if let Some(node) = dom.nodes.get_mut(focused_id) {
+                    needs_redraw = true;
+                    handled_by_input = true;
+                } else {
+                    // Non-vertical key: delegate to InputState::handle_key
                     if let Some(input_state) = node.behavior.as_input_mut() {
                         let result = input_state.handle_key(&key_event.logical_key, modifiers);
                         match result {
@@ -656,7 +658,8 @@ pub fn handle_keyboard_input(
                             }
                             input::KeyResult::Blur => {
                                 input_state.focused = false;
-                                dom.focused_node = None;
+                                new_focus = None;
+                                // dom.focused_node = None;
                                 events.push(AppEvent::Blur(FocusEventData {
                                     window_id: wid,
                                     node_id: focused_id,
@@ -672,8 +675,11 @@ pub fn handle_keyboard_input(
                         }
                     }
                 }
-            }
-        }
+                new_focus
+            })
+            .flatten();
+
+        dom.focused_node = new_focus;
     }
 
     if !handled_by_input {
@@ -705,8 +711,6 @@ pub fn handle_keyboard_input(
 
     (needs_redraw, events)
 }
-
-// ── Mouse wheel ──────────────────────────────────────────────────────
 
 pub fn handle_mouse_wheel(dom: &mut Dom, scroll_delta_y: f64) -> bool {
     let mut needs_redraw = false;

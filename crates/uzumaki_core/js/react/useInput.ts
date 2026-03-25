@@ -67,6 +67,7 @@ export function createInputHandle(
   return handle;
 }
 
+// Fixme claude cheated me this will no trigger a rerender properly ig take a look into it
 /**
  * Component-local input handle. Creates a stable handle ref that
  * lives for the lifetime of the component. Same API as createInputHandle,

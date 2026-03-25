@@ -54,12 +54,24 @@ pub struct TextContent {
 // ── Element trait ──────────────────────────────────────────────────────
 
 pub trait ElementBehavior {
-    fn as_input(&self) -> Option<&InputState> { None }
-    fn as_input_mut(&mut self) -> Option<&mut InputState> { None }
-    fn as_text(&self) -> Option<&TextContent> { None }
-    fn as_text_mut(&mut self) -> Option<&mut TextContent> { None }
-    fn is_input(&self) -> bool { false }
-    fn is_text(&self) -> bool { false }
+    fn as_input(&self) -> Option<&InputState> {
+        None
+    }
+    fn as_input_mut(&mut self) -> Option<&mut InputState> {
+        None
+    }
+    fn as_text(&self) -> Option<&TextContent> {
+        None
+    }
+    fn as_text_mut(&mut self) -> Option<&mut TextContent> {
+        None
+    }
+    fn is_input(&self) -> bool {
+        false
+    }
+    fn is_text(&self) -> bool {
+        false
+    }
 }
 
 pub struct ViewBehavior;
@@ -70,19 +82,42 @@ pub struct TextBehavior {
 }
 
 impl ElementBehavior for TextBehavior {
-    fn as_text(&self) -> Option<&TextContent> { Some(&self.content) }
-    fn as_text_mut(&mut self) -> Option<&mut TextContent> { Some(&mut self.content) }
-    fn is_text(&self) -> bool { true }
+    fn as_text(&self) -> Option<&TextContent> {
+        Some(&self.content)
+    }
+    fn as_text_mut(&mut self) -> Option<&mut TextContent> {
+        Some(&mut self.content)
+    }
+    fn is_text(&self) -> bool {
+        true
+    }
 }
 
+#[derive(Default)]
 pub struct InputBehavior {
     pub state: InputState,
 }
 
+impl InputBehavior {
+    pub fn new(state: InputState) -> Self {
+        Self { state }
+    }
+
+    pub fn new_single_line() -> Self {
+        Self::new(InputState::new(false))
+    }
+}
+
 impl ElementBehavior for InputBehavior {
-    fn as_input(&self) -> Option<&InputState> { Some(&self.state) }
-    fn as_input_mut(&mut self) -> Option<&mut InputState> { Some(&mut self.state) }
-    fn is_input(&self) -> bool { true }
+    fn as_input(&self) -> Option<&InputState> {
+        Some(&self.state)
+    }
+    fn as_input_mut(&mut self) -> Option<&mut InputState> {
+        Some(&mut self.state)
+    }
+    fn is_input(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -136,7 +171,6 @@ pub struct Dom {
     pub scroll_lock: Option<(NodeId, std::time::Instant)>,
 }
 
-
 // Safety:  We only access it from main thread
 unsafe impl Send for Dom {}
 unsafe impl Sync for Dom {}
@@ -158,6 +192,20 @@ impl Dom {
             scroll_drag: None,
             scroll_lock: None,
         }
+    }
+
+    pub fn has_focused_node(&self) -> bool {
+        self.focused_node.is_some()
+    }
+
+    pub(crate) fn with_focused_node<R>(
+        &mut self,
+        update: impl FnOnce(&mut Node, NodeId) -> R,
+    ) -> Option<R> {
+        let focus = self.focused_node;
+        focus
+            .map(|id| self.nodes.get_mut(id).map(|node| update(node, id)))
+            .flatten()
     }
 
     pub fn get_node(&self, node_id: NodeId) -> Option<&Node> {
@@ -213,7 +261,9 @@ impl Dom {
             next_sibling: None,
             prev_sibling: None,
             taffy_node,
-            behavior: Box::new(TextBehavior { content: text.clone() }),
+            behavior: Box::new(TextBehavior {
+                content: text.clone(),
+            }),
             style,
             interactivity: Interactivity::new(),
             scroll_state: None,
@@ -244,7 +294,7 @@ impl Dom {
             next_sibling: None,
             prev_sibling: None,
             taffy_node,
-            behavior: Box::new(InputBehavior { state: InputState::new() }),
+            behavior: Box::new(InputBehavior::new_single_line()),
             style,
             interactivity: Interactivity::new(),
             scroll_state: None,
@@ -354,7 +404,9 @@ impl Dom {
         if let Some(existing) = node.behavior.as_text_mut() {
             existing.content = tc.content.clone();
         } else {
-            node.behavior = Box::new(TextBehavior { content: tc.clone() });
+            node.behavior = Box::new(TextBehavior {
+                content: tc.clone(),
+            });
         }
         let taffy_node = node.taffy_node;
         let font_size = node.style.text.font_size;
@@ -541,11 +593,13 @@ impl Dom {
                             .interactivity
                             .compute_style(&node.style, &self.hit_state);
 
-                        let text = node.behavior.as_text().map(|tc| (
-                            tc.content.clone(),
-                            computed_style.text.font_size,
-                            computed_style.text.color,
-                        ));
+                        let text = node.behavior.as_text().map(|tc| {
+                            (
+                                tc.content.clone(),
+                                computed_style.text.font_size,
+                                computed_style.text.color,
+                            )
+                        });
 
                         let input = node.behavior.as_input().map(|is| InputRenderInfo {
                             display_text: is.display_text(),
@@ -691,16 +745,31 @@ impl Dom {
 
                     if let Some(input_info) = &info.input {
                         crate::elements::input::paint_input(
-                            scene, text_renderer, bounds, &info.style, input_info, scale,
+                            scene,
+                            text_renderer,
+                            bounds,
+                            &info.style,
+                            input_info,
+                            scale,
                         );
                     } else if let Some((content, font_size, color)) = &info.text {
                         crate::elements::text::paint_text(
-                            scene, text_renderer, bounds, &info.style,
-                            content, *font_size, *color, scale,
+                            scene,
+                            text_renderer,
+                            bounds,
+                            &info.style,
+                            content,
+                            *font_size,
+                            *color,
+                            scale,
                         );
                     } else {
                         crate::elements::view::paint_view(
-                            scene, bounds, &info.style, scale, |_| {},
+                            scene,
+                            bounds,
+                            &info.style,
+                            scale,
+                            |_| {},
                         );
                     }
                 }

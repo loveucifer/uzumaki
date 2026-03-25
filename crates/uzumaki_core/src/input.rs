@@ -83,8 +83,8 @@ pub struct InputState {
     pub sticky_x: Option<f32>,
 }
 
-impl InputState {
-    pub fn new() -> Self {
+impl Default for InputState {
+    fn default() -> Self {
         Self {
             model: TextModel::new(),
             selection: TextSelection::default(),
@@ -99,6 +99,14 @@ impl InputState {
             sticky_col: None,
             sticky_x: None,
         }
+    }
+}
+
+impl InputState {
+    pub fn new(multi_line: bool) -> Self {
+        let mut state = Self::default();
+        state.multiline = multi_line;
+        state
     }
 
     /// Delete the current selection. Returns true if something was deleted.
@@ -618,7 +626,7 @@ mod tests {
     use super::*;
 
     fn input(text: &str) -> InputState {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.set_value(text.to_string());
         is
     }
@@ -639,7 +647,7 @@ mod tests {
 
     #[test]
     fn insert_text_basic() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.insert_text("hello");
         assert_eq!(is.model.text(), "hello");
         assert_eq!(is.selection.active, 5);
@@ -1155,7 +1163,7 @@ mod tests {
 
     #[test]
     fn integration_type_select_delete_type() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.insert_text("hello world");
         assert_eq!(is.model.text(), "hello world");
 
@@ -1172,7 +1180,7 @@ mod tests {
 
     #[test]
     fn integration_multiline_editing() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.multiline = true;
         is.insert_text("line1\nline2\nline3");
         assert_eq!(is.model.text(), "line1\nline2\nline3");
@@ -1193,7 +1201,7 @@ mod tests {
 
     #[test]
     fn max_length_blocks_insert() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.model.max_length = Some(5);
         is.insert_text("hello");
         assert_eq!(is.model.text(), "hello");
@@ -1203,7 +1211,7 @@ mod tests {
 
     #[test]
     fn max_length_allows_replace_within_limit() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.model.max_length = Some(5);
         is.insert_text("hello");
         // Select all and replace with shorter text
@@ -1216,7 +1224,7 @@ mod tests {
     /// Type "hello world", press Enter to split into two lines, verify content.
     #[test]
     fn should_split_line_on_enter() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.multiline = true;
 
         // Type "hello world"
@@ -1238,7 +1246,7 @@ mod tests {
     /// Type on line 1, Enter, type on line 2, move up, insert text on line 1.
     #[test]
     fn should_type_enter_move_up_and_insert() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.multiline = true;
 
         is.insert_text("aaa");
@@ -1261,7 +1269,7 @@ mod tests {
     /// Type two lines, move up, move left twice, insert a character mid-line.
     #[test]
     fn should_move_up_left_and_insert_mid_line() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.multiline = true;
 
         is.insert_text("abcd\nefgh");
@@ -1286,7 +1294,7 @@ mod tests {
     /// Split a line in the middle: "helloworld" → Enter at pos 5 → "hello\nworld".
     #[test]
     fn should_split_line_in_middle_and_continue_typing() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.multiline = true;
 
         is.insert_text("helloworld");
@@ -1306,7 +1314,7 @@ mod tests {
     /// Join two lines by pressing Backspace at the start of line 2.
     #[test]
     fn should_join_lines_with_backspace() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.multiline = true;
 
         is.insert_text("hello\nworld");
@@ -1326,7 +1334,7 @@ mod tests {
     /// Type three lines, navigate up/down, delete and re-type.
     #[test]
     fn should_navigate_up_delete_and_retype_line() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.multiline = true;
 
         is.insert_text("first");
@@ -1367,7 +1375,7 @@ mod tests {
     /// Type text, use Home/End to navigate, then edit.
     #[test]
     fn should_use_home_end_to_navigate_and_edit() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.multiline = true;
 
         is.insert_text("hello world\ngoodbye");
@@ -1395,7 +1403,7 @@ mod tests {
     /// Select text across lines and replace it.
     #[test]
     fn should_select_across_lines_and_replace() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.multiline = true;
 
         is.insert_text("aaa\nbbb\nccc");
@@ -1414,7 +1422,7 @@ mod tests {
 
     #[test]
     fn should_move_down_insert_and_stuff() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
         is.insert_text("Line 1\nLine 2\nLine 3");
         is.move_to(4, false);
         is.insert_text("A");
@@ -1431,7 +1439,7 @@ mod tests {
     /// Simulate typing a function: type name, parens, Enter, body, Enter, close brace.
     #[test]
     fn should_type_function_body_and_fix_string() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
 
         is.insert_text("fn main() {");
         is.insert_text("\n");
@@ -1469,7 +1477,7 @@ mod tests {
     /// Move down past a shorter line, verify sticky column behavior.
     #[test]
     fn should_preserve_sticky_col_through_short_line() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
 
         is.insert_text("long line here\nhi\nlong line here");
         // Cursor at end: row 2, col 14
@@ -1493,7 +1501,7 @@ mod tests {
     /// Delete forward at end of line joins with next line.
     #[test]
     fn should_delete_forward_at_line_end_join_lines() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
 
         is.insert_text("abc\ndef");
         // Move to end of line 1 (pos 3 = row 0, col 3)
@@ -1510,7 +1518,7 @@ mod tests {
     /// Type, make a mistake, backspace, correct it — common editing pattern.
     #[test]
     fn should_correct_typo_with_backspace() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
 
         // Type "teh " (typo for "the ")
         is.insert_text("teh ");
@@ -1534,7 +1542,7 @@ mod tests {
     /// Multiple Enter presses to create blank lines, then navigate and fill them.
     #[test]
     fn should_create_blank_lines_then_fill() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
 
         is.insert_text("header");
         is.insert_text("\n");
@@ -1560,7 +1568,7 @@ mod tests {
     /// Word-delete backward on a multiline buffer.
     #[test]
     fn should_word_delete_backward_across_lines() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
 
         is.insert_text("hello world\ngoodbye planet");
         assert_eq!(is.cursor_rowcol(), (1, 14));
@@ -1582,7 +1590,7 @@ mod tests {
     /// Select all, delete, type fresh — common "clear and retype" workflow.
     #[test]
     fn should_select_all_and_retype() {
-        let mut is = InputState::new();
+        let mut is = InputState::default();
 
         is.insert_text("old content\nspanning\nmultiple lines");
         assert_eq!(is.model.line_count(), 3);
