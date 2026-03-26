@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "react": "^19.2.4",
-    "uzumaki": "workspace:*"
+    "uzumaki-ui": "workspace:*"
   },
   "peerDependencies": {
     "typescript": "^5"

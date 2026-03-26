@@ -1,6 +1,6 @@
 {
-  "name": "uzumaki",
-  "package": "uzumaki",
+  "name": "uzumaki-ui",
+  "package": "uzumaki-ui",
   "bin": {
     "uzumaki": "./js/cli.ts"
   },

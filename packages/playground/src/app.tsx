@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useInput } from 'uzumaki/react';
+import { useInput } from 'uzumaki-ui/react';
 import {
   NAV_ACTIVE,
   NAV_ITEM,
