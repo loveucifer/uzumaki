@@ -4,8 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "pnpm build:core && pnpm --filter playground start",
-    "build:core": "cargo build --release -p uzumaki && bun scripts/copy-binary.ts --release",
+    "start": "pnpm --filter playground start",
+    "build:core": "cargo build --release -p uzumaki",
     "format": "prettier --write ."
   },
   "devDependencies": {

@@ -5,8 +5,6 @@ use crate::element::{Dom, NodeId, ScrollDragState};
 use crate::input;
 use crate::window::Window;
 
-// ── Event data structs ───────────────────────────────────────────────
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MouseEventData {
@@ -24,11 +22,18 @@ pub struct MouseEventData {
 #[serde(rename_all = "camelCase")]
 pub struct KeyEventData {
     pub window_id: u32,
+    pub node_id: Option<NodeId>,
     pub key: String,
     pub code: String,
     pub key_code: u32,
     pub modifiers: u32,
     pub repeat: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowLoadEventData {
+    pub window_id: u32,
 }
 
 #[derive(Serialize)]
@@ -68,6 +73,8 @@ pub enum AppEvent {
     Input(InputEventData),
     Focus(FocusEventData),
     Blur(FocusEventData),
+    #[serde(rename = "windowLoad")]
+    WindowLoad(WindowLoadEventData),
     HotReload,
 }
 
@@ -576,140 +583,141 @@ pub fn handle_mouse_input(
     (needs_redraw, events)
 }
 
-// handles the keyboard input and returns if redraw is needed and events to dispatch (todo this is bad we should sync emit from js side)
-pub fn handle_keyboard_input(
+/// Build the raw KeyDown/KeyUp event. Returns None for F5 (hot reload) or unmappable keys.
+pub fn build_key_event(
+    dom: &Dom,
+    wid: u32,
+    key_event: &winit::event::KeyEvent,
+    modifiers: u32,
+) -> Option<AppEvent> {
+    use winit::event::ElementState;
+    use winit::keyboard::PhysicalKey;
+
+    // F5 hot reload
+    if key_event.state == ElementState::Pressed && key_event.logical_key == Key::Named(NamedKey::F5)
+    {
+        return Some(AppEvent::HotReload);
+    }
+
+    let key_str = match &key_event.logical_key {
+        Key::Character(c) => c.to_string(),
+        Key::Named(named) => format!("{:?}", named),
+        _ => return None,
+    };
+
+    let code_str = match key_event.physical_key {
+        PhysicalKey::Code(kc) => format!("{:?}", kc),
+        _ => String::new(),
+    };
+
+    let data = KeyEventData {
+        window_id: wid,
+        node_id: dom.focused_node,
+        key: key_str,
+        code: code_str,
+        key_code: 0,
+        modifiers,
+        repeat: key_event.repeat,
+    };
+
+    Some(match key_event.state {
+        ElementState::Pressed => AppEvent::KeyDown(data),
+        ElementState::Released => AppEvent::KeyUp(data),
+    })
+}
+
+/// Handle keyboard input for the focused input element. Called AFTER the raw key
+/// event has been dispatched to JS (so preventDefault can suppress this).
+/// Returns (needs_redraw, events_to_dispatch).
+pub fn handle_key_for_input(
     dom: &mut Dom,
-    _handle: &mut Window,
     wid: u32,
     key_event: &winit::event::KeyEvent,
     modifiers: u32,
 ) -> (bool, Vec<AppEvent>) {
-    // todo split this function TT
     use winit::event::ElementState;
-    use winit::keyboard::PhysicalKey;
 
     let mut needs_redraw = false;
     let mut events: Vec<AppEvent> = Vec::new();
 
-    // F5 hot reload
-    // todo we should do this after the event listners are done also enable only in dev
-    if key_event.state == ElementState::Pressed && key_event.logical_key == Key::Named(NamedKey::F5)
-    {
-        events.push(AppEvent::HotReload);
+    if key_event.state != ElementState::Pressed {
         return (needs_redraw, events);
     }
 
-    // Route keyboard to focused input if present
-    let mut handled_by_input = false;
+    let new_focus = dom
+        .with_focused_node(|node, focused_id| {
+            let mut new_focus = Some(focused_id);
 
-    if key_event.state == ElementState::Pressed {
-        let new_focus = dom
-            .with_focused_node(|node, focused_id| {
-                let mut new_focus = Some(focused_id);
+            let shift = modifiers & 4 != 0;
 
-                let shift = modifiers & 4 != 0;
+            // Handle ArrowUp/ArrowDown externally (vertical nav)
+            let is_vertical_nav = matches!(
+                key_event.logical_key,
+                Key::Named(NamedKey::ArrowUp) | Key::Named(NamedKey::ArrowDown)
+            );
 
-                // Handle ArrowUp/ArrowDown externally (vertical nav)
-                let is_vertical_nav = matches!(
-                    key_event.logical_key,
-                    Key::Named(NamedKey::ArrowUp) | Key::Named(NamedKey::ArrowDown)
-                );
+            if is_vertical_nav {
+                let is_up = key_event.logical_key == Key::Named(NamedKey::ArrowUp);
+                let extend = shift;
 
-                if is_vertical_nav {
-                    let is_up = key_event.logical_key == Key::Named(NamedKey::ArrowUp);
-                    let extend = shift;
-
-                    if let Some(is) = node.behavior.as_input_mut() {
-                        let (_, cur_col) = is.cursor_rowcol();
-                        let sticky = is.sticky_col.unwrap_or(cur_col);
-                        if is_up {
-                            is.move_up(extend, Some(sticky));
-                        } else {
-                            is.move_down(extend, Some(sticky));
-                        }
-                        is.sticky_col = Some(sticky);
-                        is.sticky_x = None;
-                        is.reset_blink();
+                if let Some(is) = node.behavior.as_input_mut() {
+                    let (_, cur_col) = is.cursor_rowcol();
+                    let sticky = is.sticky_col.unwrap_or(cur_col);
+                    if is_up {
+                        is.move_up(extend, Some(sticky));
+                    } else {
+                        is.move_down(extend, Some(sticky));
                     }
+                    is.sticky_col = Some(sticky);
+                    is.sticky_x = None;
+                    is.reset_blink();
+                }
 
-                    needs_redraw = true;
-                    handled_by_input = true;
-                } else {
-                    // Non-vertical key: delegate to InputState::handle_key
-                    if let Some(input_state) = node.behavior.as_input_mut() {
-                        let result = input_state.handle_key(&key_event.logical_key, modifiers);
-                        match result {
-                            input::KeyResult::Edit(edit) => {
-                                let value = input_state.model.text();
-                                let input_type = match edit.kind {
-                                    input::EditKind::Insert => "insertText",
-                                    input::EditKind::DeleteBackward => "deleteContentBackward",
-                                    input::EditKind::DeleteForward => "deleteContentForward",
-                                    input::EditKind::DeleteWordBackward => "deleteWordBackward",
-                                    input::EditKind::DeleteWordForward => "deleteWordForward",
-                                };
-                                events.push(AppEvent::Input(InputEventData {
-                                    window_id: wid,
-                                    node_id: focused_id,
-                                    value,
-                                    input_type: input_type.to_string(),
-                                    data: edit.inserted,
-                                }));
-                                needs_redraw = true;
-                                handled_by_input = true;
-                            }
-                            input::KeyResult::Blur => {
-                                input_state.focused = false;
-                                new_focus = None;
-                                // dom.focused_node = None;
-                                events.push(AppEvent::Blur(FocusEventData {
-                                    window_id: wid,
-                                    node_id: focused_id,
-                                }));
-                                needs_redraw = true;
-                                handled_by_input = true;
-                            }
-                            input::KeyResult::Handled => {
-                                needs_redraw = true;
-                                handled_by_input = true;
-                            }
-                            input::KeyResult::Ignored => {}
+                needs_redraw = true;
+            } else {
+                // Non-vertical key: delegate to InputState::handle_key
+                if let Some(input_state) = node.behavior.as_input_mut() {
+                    let result = input_state.handle_key(&key_event.logical_key, modifiers);
+                    match result {
+                        input::KeyResult::Edit(edit) => {
+                            let value = input_state.model.text();
+                            let input_type = match edit.kind {
+                                input::EditKind::Insert => "insertText",
+                                input::EditKind::DeleteBackward => "deleteContentBackward",
+                                input::EditKind::DeleteForward => "deleteContentForward",
+                                input::EditKind::DeleteWordBackward => "deleteWordBackward",
+                                input::EditKind::DeleteWordForward => "deleteWordForward",
+                            };
+                            events.push(AppEvent::Input(InputEventData {
+                                window_id: wid,
+                                node_id: focused_id,
+                                value,
+                                input_type: input_type.to_string(),
+                                data: edit.inserted,
+                            }));
+                            needs_redraw = true;
                         }
+                        input::KeyResult::Blur => {
+                            input_state.focused = false;
+                            new_focus = None;
+                            events.push(AppEvent::Blur(FocusEventData {
+                                window_id: wid,
+                                node_id: focused_id,
+                            }));
+                            needs_redraw = true;
+                        }
+                        input::KeyResult::Handled => {
+                            needs_redraw = true;
+                        }
+                        input::KeyResult::Ignored => {}
                     }
                 }
-                new_focus
-            })
-            .flatten();
+            }
+            new_focus
+        })
+        .flatten();
 
-        dom.focused_node = new_focus;
-    }
-
-    if !handled_by_input {
-        let key_str = match &key_event.logical_key {
-            Key::Character(c) => c.to_string(),
-            Key::Named(named) => format!("{:?}", named),
-            _ => return (needs_redraw, events),
-        };
-
-        let code_str = match key_event.physical_key {
-            PhysicalKey::Code(kc) => format!("{:?}", kc),
-            _ => String::new(),
-        };
-
-        let data = KeyEventData {
-            window_id: wid,
-            key: key_str,
-            code: code_str,
-            key_code: 0,
-            modifiers,
-            repeat: key_event.repeat,
-        };
-
-        match key_event.state {
-            ElementState::Pressed => events.push(AppEvent::KeyDown(data)),
-            ElementState::Released => events.push(AppEvent::KeyUp(data)),
-        }
-    }
+    dom.focused_node = new_focus;
 
     (needs_redraw, events)
 }

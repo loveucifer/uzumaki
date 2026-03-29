@@ -68,10 +68,15 @@ interface ElementAttributes
 
 interface EventProps {
   onClick?: (ev: UzumakiMouseEvent) => void;
+  onClickCapture?: (ev: UzumakiMouseEvent) => void;
   onMouseDown?: (ev: UzumakiMouseEvent) => void;
+  onMouseDownCapture?: (ev: UzumakiMouseEvent) => void;
   onMouseUp?: (ev: UzumakiMouseEvent) => void;
+  onMouseUpCapture?: (ev: UzumakiMouseEvent) => void;
   onKeyDown?: (ev: UzumakiKeyboardEvent) => void;
+  onKeyDownCapture?: (ev: UzumakiKeyboardEvent) => void;
   onKeyUp?: (ev: UzumakiKeyboardEvent) => void;
+  onKeyUpCapture?: (ev: UzumakiKeyboardEvent) => void;
 }
 
 export namespace JSX {

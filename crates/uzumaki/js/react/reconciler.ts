@@ -136,22 +136,35 @@ function toEnumValue(key: number, value: any): number {
       return FLEX_DIR_MAP[s] ?? 0;
     case PropKey.Items:
       return (
-        ({
-          'flex-start': 0, start: 0,
-          'flex-end': 1, end: 1,
-          center: 2, stretch: 3, baseline: 4,
-        } as any)[s] ?? 3
+        (
+          {
+            'flex-start': 0,
+            start: 0,
+            'flex-end': 1,
+            end: 1,
+            center: 2,
+            stretch: 3,
+            baseline: 4,
+          } as any
+        )[s] ?? 3
       );
     case PropKey.Justify:
       return (
-        ({
-          'flex-start': 0, start: 0,
-          'flex-end': 1, end: 1,
-          center: 2,
-          'space-between': 3, between: 3,
-          'space-around': 4, around: 4,
-          'space-evenly': 5, evenly: 5,
-        } as any)[s] ?? 0
+        (
+          {
+            'flex-start': 0,
+            start: 0,
+            'flex-end': 1,
+            end: 1,
+            center: 2,
+            'space-between': 3,
+            between: 3,
+            'space-around': 4,
+            around: 4,
+            'space-evenly': 5,
+            evenly: 5,
+          } as any
+        )[s] ?? 0
       );
     case PropKey.Display:
       return ({ none: 0, flex: 1, block: 2 } as any)[s] ?? 1;
@@ -228,8 +241,17 @@ function isEventProp(key: string): boolean {
   );
 }
 
-function eventPropToName(key: string): string {
-  return key.slice(2).toLowerCase();
+interface ListenerEntry {
+  handler: Function;
+  capture: boolean;
+}
+
+function parseEventProp(key: string): { name: string; capture: boolean } {
+  const raw = key.slice(2); // strip "on"
+  if (raw.endsWith('Capture')) {
+    return { name: raw.slice(0, -7).toLowerCase(), capture: true };
+  }
+  return { name: raw.toLowerCase(), capture: false };
 }
 
 // ── Element classes ──────────────────────────────────────────────────
@@ -239,7 +261,8 @@ abstract class BaseElement {
   readonly type: string;
   readonly windowId: number;
   styles: Record<string, any> = {};
-  eventListeners: Map<string, Function> = new Map();
+  /** Keyed by event name (e.g. "click"). Value includes handler + phase. */
+  eventListeners: Map<string, ListenerEntry> = new Map();
   children: BaseElement[] = [];
   parent: BaseElement | null = null;
 
@@ -258,8 +281,13 @@ abstract class BaseElement {
   applyEvents(): void {
     if (this.eventListeners.size > 0) {
       core.setF32Prop(this.windowId, this.id, PropKey.Interactive, 1);
-      for (const [event, cb] of this.eventListeners) {
-        eventManager.addHandlerByName(this.id, event, cb);
+      for (const [name, entry] of this.eventListeners) {
+        eventManager.addHandlerByName(
+          this.id,
+          name,
+          entry.handler,
+          entry.capture,
+        );
       }
     }
   }
@@ -278,19 +306,40 @@ abstract class BaseElement {
     this.styles = newStyles;
   }
 
-  updateEvents(newListeners: Map<string, Function>): void {
-    for (const [event, newCb] of newListeners) {
-      const oldCb = this.eventListeners.get(event);
-      if (oldCb !== newCb) {
-        if (oldCb) eventManager.removeHandlerByName(this.id, event, oldCb);
-        eventManager.addHandlerByName(this.id, event, newCb);
+  updateEvents(newListeners: Map<string, ListenerEntry>): void {
+    for (const [name, newEntry] of newListeners) {
+      const old = this.eventListeners.get(name);
+      if (
+        !old ||
+        old.handler !== newEntry.handler ||
+        old.capture !== newEntry.capture
+      ) {
+        if (old)
+          eventManager.removeHandlerByName(
+            this.id,
+            name,
+            old.handler,
+            old.capture,
+          );
+        eventManager.addHandlerByName(
+          this.id,
+          name,
+          newEntry.handler,
+          newEntry.capture,
+        );
       }
     }
-    for (const [event, cb] of this.eventListeners) {
-      if (!newListeners.has(event)) {
-        eventManager.removeHandlerByName(this.id, event, cb);
+    for (const [name, old] of this.eventListeners) {
+      if (!newListeners.has(name)) {
+        eventManager.removeHandlerByName(
+          this.id,
+          name,
+          old.handler,
+          old.capture,
+        );
       }
     }
+
     if (newListeners.size > 0 && this.eventListeners.size === 0) {
       core.setF32Prop(this.windowId, this.id, PropKey.Interactive, 1);
     } else if (newListeners.size === 0 && this.eventListeners.size > 0) {
@@ -320,7 +369,8 @@ class ViewElement extends BaseElement {
       const value = props[key];
       if (value == null) continue;
       if (isEventProp(key)) {
-        this.eventListeners.set(eventPropToName(key), value);
+        const { name, capture } = parseEventProp(key);
+        this.eventListeners.set(name, { handler: value, capture });
       } else if (PROP_NAME_TO_KEY[key] !== undefined) {
         this.styles[key] = value;
       }
@@ -329,14 +379,15 @@ class ViewElement extends BaseElement {
 
   commitUpdate(newProps: Record<string, any>): void {
     const newStyles: Record<string, any> = {};
-    const newEvents: Map<string, Function> = new Map();
+    const newEvents: Map<string, ListenerEntry> = new Map();
 
     for (const key in newProps) {
       if (key === 'children' || key === 'key' || key === 'ref') continue;
       const value = newProps[key];
       if (value == null) continue;
       if (isEventProp(key)) {
-        newEvents.set(eventPropToName(key), value);
+        const { name, capture } = parseEventProp(key);
+        newEvents.set(name, { handler: value, capture });
       } else if (PROP_NAME_TO_KEY[key] !== undefined) {
         newStyles[key] = value;
       }
@@ -374,12 +425,18 @@ class InputElement extends BaseElement {
 
   private parseProps(props: Record<string, any>): void {
     for (const key in props) {
-      if (key === 'children' || key === 'key' || key === 'ref' || key === 'handle')
+      if (
+        key === 'children' ||
+        key === 'key' ||
+        key === 'ref' ||
+        key === 'handle'
+      )
         continue;
       const value = props[key];
       if (value == null) continue;
       if (isEventProp(key)) {
-        this.eventListeners.set(eventPropToName(key), value);
+        const { name, capture } = parseEventProp(key);
+        this.eventListeners.set(name, { handler: value, capture });
       } else if (INPUT_ATTR_NAMES.has(key)) {
         this.inputAttrs[key] = value;
       } else if (PROP_NAME_TO_KEY[key] !== undefined) {
@@ -424,15 +481,21 @@ class InputElement extends BaseElement {
   commitUpdate(newProps: Record<string, any>): void {
     const newStyles: Record<string, any> = {};
     const newInputAttrs: Record<string, any> = {};
-    const newEvents: Map<string, Function> = new Map();
+    const newEvents: Map<string, ListenerEntry> = new Map();
 
     for (const key in newProps) {
-      if (key === 'children' || key === 'key' || key === 'ref' || key === 'handle')
+      if (
+        key === 'children' ||
+        key === 'key' ||
+        key === 'ref' ||
+        key === 'handle'
+      )
         continue;
       const value = newProps[key];
       if (value == null) continue;
       if (isEventProp(key)) {
-        newEvents.set(eventPropToName(key), value);
+        const { name, capture } = parseEventProp(key);
+        newEvents.set(name, { handler: value, capture });
       } else if (INPUT_ATTR_NAMES.has(key)) {
         newInputAttrs[key] = value;
       } else if (PROP_NAME_TO_KEY[key] !== undefined) {
@@ -522,7 +585,8 @@ class TextElement extends BaseElement {
       const value = props[key];
       if (value == null) continue;
       if (isEventProp(key)) {
-        this.eventListeners.set(eventPropToName(key), value);
+        const { name, capture } = parseEventProp(key);
+        this.eventListeners.set(name, { handler: value, capture });
       } else if (PROP_NAME_TO_KEY[key] !== undefined) {
         this.styles[key] = value;
       }
@@ -542,14 +606,15 @@ class TextElement extends BaseElement {
     newChildren: any,
   ): void {
     const newStyles: Record<string, any> = {};
-    const newEvents: Map<string, Function> = new Map();
+    const newEvents: Map<string, ListenerEntry> = new Map();
 
     for (const key in newProps) {
       if (key === 'children' || key === 'key' || key === 'ref') continue;
       const value = newProps[key];
       if (value == null) continue;
       if (isEventProp(key)) {
-        newEvents.set(eventPropToName(key), value);
+        const { name, capture } = parseEventProp(key);
+        newEvents.set(name, { handler: value, capture });
       } else if (PROP_NAME_TO_KEY[key] !== undefined) {
         newStyles[key] = value;
       }
@@ -562,8 +627,6 @@ class TextElement extends BaseElement {
     this.setText(newText);
   }
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────
 
 type Container = {
   window: Window;
@@ -602,8 +665,6 @@ function createElementInstance(
   }
   return new ViewElement(windowId, type, props);
 }
-
-// ── Reconciler ───────────────────────────────────────────────────────
 
 type Type = string;
 type Props = Record<string, any>;
@@ -657,7 +718,6 @@ const reconciler = ReactReconciler<
   appendInitialChild(parent, child) {
     parent.children.push(child);
     child.parent = parent;
-    eventManager.setParent(child.id, parent.id);
     core.appendChild(parent.windowId, parent.id, child.id);
   },
 
@@ -668,14 +728,12 @@ const reconciler = ReactReconciler<
   appendChildToContainer(container, child) {
     const windowId = getWindowId(container);
     child.parent = null;
-    eventManager.setParent(child.id, container.rootNodeId);
     core.appendChild(windowId, container.rootNodeId, child.id);
   },
 
   appendChild(parent, child) {
     parent.children.push(child);
     child.parent = parent;
-    eventManager.setParent(child.id, parent.id);
     core.appendChild(parent.windowId, parent.id, child.id);
   },
 
@@ -687,14 +745,12 @@ const reconciler = ReactReconciler<
       parent.children.push(child);
     }
     child.parent = parent;
-    eventManager.setParent(child.id, parent.id);
     core.insertBefore(parent.windowId, parent.id, child.id, before.id);
   },
 
   insertInContainerBefore(container, child, before) {
     const windowId = getWindowId(container);
     child.parent = null;
-    eventManager.setParent(child.id, container.rootNodeId);
     core.insertBefore(windowId, container.rootNodeId, child.id, before.id);
   },
 
@@ -769,15 +825,15 @@ const reconciler = ReactReconciler<
     currentContainer = null;
   },
 
-  preparePortalMount: () => { },
+  preparePortalMount: () => {},
   scheduleTimeout: (fn, delay) => setTimeout(fn, delay),
   cancelTimeout: (id) => clearTimeout(id),
   noTimeout: undefined,
   isPrimaryRenderer: true,
   getInstanceFromNode: () => null,
-  beforeActiveInstanceBlur: () => { },
-  afterActiveInstanceBlur: () => { },
-  prepareScopeUpdate: () => { },
+  beforeActiveInstanceBlur: () => {},
+  afterActiveInstanceBlur: () => {},
+  prepareScopeUpdate: () => {},
   getInstanceFromScope: () => null,
   supportsHydration: false,
   NotPendingTransition: undefined,
@@ -791,16 +847,16 @@ const reconciler = ReactReconciler<
   },
   getCurrentUpdatePriority: () => currentPriority,
   resolveUpdatePriority: () => DefaultEventPriority,
-  resetFormInstance: () => { },
-  requestPostPaintCallback: () => { },
+  resetFormInstance: () => {},
+  requestPostPaintCallback: () => {},
   shouldAttemptEagerTransition: () => false,
-  trackSchedulerEvent: () => { },
+  trackSchedulerEvent: () => {},
   resolveEventType: () => null,
   resolveEventTimeStamp: () => Date.now(),
   maySuspendCommit: () => false,
   preloadInstance: () => false,
   startSuspendingCommit: () => false,
-  suspendInstance: () => { },
+  suspendInstance: () => {},
   waitForCommitToBeReady: () => null,
 });
 
@@ -812,8 +868,6 @@ export function render(window: Window, element: JSX.Element) {
   const rootNodeId = core.getRootNodeId(window.id);
   const container: Container = { window, rootNodeId };
 
-  eventManager.setParent(rootNodeId, window.eventId);
-
   const root = reconciler.createContainer(
     container,
     1,
@@ -824,7 +878,7 @@ export function render(window: Window, element: JSX.Element) {
     console.error,
     console.error,
     console.error,
-    () => { },
+    () => {},
   );
 
   roots.set(window.label, { root, container });
@@ -833,7 +887,6 @@ export function render(window: Window, element: JSX.Element) {
   return {
     dispose: () => {
       reconciler.updateContainer(null, root, null, null);
-      eventManager.removeParent(rootNodeId);
       roots.delete(window.label);
     },
   };

@@ -1,9 +1,12 @@
 import core from './core';
-import { eventManager, type UzumakiEvent } from './events';
+import {
+  eventManager,
+  EVENT_NAME_TO_TYPE,
+  type EventName,
+  type EventHandler,
+} from './events';
 
 const windowsByLabel = new Map<string, Window>();
-
-type EventHandler = (ev: UzumakiEvent) => void;
 
 export interface WindowAttributes {
   width: number;
@@ -17,7 +20,6 @@ export class Window {
   private _width: number;
   private _height: number;
   private _remBase: number = 16;
-  private _eventId: string;
 
   constructor(
     label: string,
@@ -36,12 +38,13 @@ export class Window {
     this._height = height;
     this._label = label;
     this._id = core.createWindow({ width, height, title });
-    this._eventId = `__window_${this._id}`;
     windowsByLabel.set(label, this);
   }
 
   close() {
-    eventManager.clearNode(this._eventId);
+    eventManager.clearWindowHandlers(this._id);
+    windowsByLabel.delete(this._label);
+    core.requestClose();
   }
 
   setSize(width: number, height: number) {
@@ -65,10 +68,6 @@ export class Window {
     return this._id;
   }
 
-  get eventId(): string {
-    return this._eventId;
-  }
-
   get remBase(): number {
     return this._remBase;
   }
@@ -78,11 +77,35 @@ export class Window {
     core.setRemBase(this._id, value);
   }
 
-  on(eventName: string, handler: EventHandler): void {
-    eventManager.addHandlerByName(this._eventId, eventName, handler);
+  on<K extends EventName>(
+    eventName: K,
+    handler: EventHandler<K>,
+    options?: { capture?: boolean },
+  ): void {
+    const t = EVENT_NAME_TO_TYPE[eventName];
+    if (t !== undefined) {
+      eventManager.addWindowHandler(
+        this._id,
+        t,
+        handler as Function,
+        options?.capture ?? false,
+      );
+    }
   }
 
-  off(eventName: string, handler: EventHandler): void {
-    eventManager.removeHandlerByName(this._eventId, eventName, handler);
+  off<K extends EventName>(
+    eventName: K,
+    handler: EventHandler<K>,
+    options?: { capture?: boolean },
+  ): void {
+    const t = EVENT_NAME_TO_TYPE[eventName];
+    if (t !== undefined) {
+      eventManager.removeWindowHandler(
+        this._id,
+        t,
+        handler as Function,
+        options?.capture ?? false,
+      );
+    }
   }
 }

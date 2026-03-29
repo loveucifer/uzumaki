@@ -1,3 +1,5 @@
+import { NodeId } from './types';
+
 export const enum PropKey {
   W = 0,
   H = 1,
@@ -92,20 +94,35 @@ interface Core {
     b: number,
     a: number,
   ): void;
-  setF32Prop(windowId: number, nodeId: any, prop: number, value: number): void;
-  setEnumProp(windowId: number, nodeId: any, prop: number, value: number): void;
-  setInputValue(windowId: number, nodeId: any, value: string): void;
-  getInputValue(windowId: number, nodeId: any): string;
-  setInputPlaceholder(windowId: number, nodeId: any, placeholder: string): void;
-  setInputDisabled(windowId: number, nodeId: any, disabled: boolean): void;
-  setInputMaxLength(windowId: number, nodeId: any, maxLength: number): void;
-  setInputMultiline(windowId: number, nodeId: any, multiline: boolean): void;
-  setInputSecure(windowId: number, nodeId: any, secure: boolean): void;
-  focusInput(windowId: number, nodeId: any): void;
+  setF32Prop(
+    windowId: number,
+    nodeId: NodeId,
+    prop: number,
+    value: number,
+  ): void;
+  setEnumProp(
+    windowId: number,
+    nodeId: NodeId,
+    prop: number,
+    value: number,
+  ): void;
+  setInputValue(windowId: number, nodeId: NodeId, value: string): void;
+  getInputValue(windowId: number, nodeId: NodeId): string;
+  setInputPlaceholder(
+    windowId: number,
+    nodeId: NodeId,
+    placeholder: string,
+  ): void;
+  setInputDisabled(windowId: number, nodeId: NodeId, disabled: boolean): void;
+  setInputMaxLength(windowId: number, nodeId: NodeId, maxLength: number): void;
+  setInputMultiline(windowId: number, nodeId: NodeId, multiline: boolean): void;
+  setInputSecure(windowId: number, nodeId: NodeId, secure: boolean): void;
+  focusInput(windowId: number, nodeId: NodeId): void;
   setRemBase(windowId: number, value: number): void;
   getWindowWidth(windowId: number): number | null;
   getWindowHeight(windowId: number): number | null;
   getWindowTitle(windowId: number): string | null;
+  getAncestorPath(windowId: number, nodeId: NodeId): any[]; // returns NodeId[]
 }
 
 const core: Core = (globalThis as unknown as any)

@@ -29,6 +29,7 @@ Object.defineProperty(globalThis, '__uzumaki_ops_dont_touch_this__', {
     getWindowWidth: ops.op_get_window_width,
     getWindowHeight: ops.op_get_window_height,
     getWindowTitle: ops.op_get_window_title,
+    getAncestorPath: ops.op_get_ancestor_path,
   }),
   writable: false,
   configurable: false,

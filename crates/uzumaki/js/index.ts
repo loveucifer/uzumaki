@@ -3,6 +3,10 @@ import { eventManager, EventType } from './events';
 export { Window } from './window';
 export { eventManager, EventType } from './events';
 export type {
+  EventPhase,
+  EventName,
+  EventHandler,
+  EventHandlerMap,
   UzumakiEvent,
   UzumakiMouseEvent,
   UzumakiKeyboardEvent,
@@ -12,58 +16,69 @@ export type {
 
 interface AppEvent {
   type: string;
-  windowId?: number;
+  windowId: number;
   nodeId?: any;
   key?: string;
+  code?: string;
+  keyCode?: number;
+  modifiers?: number;
+  repeat?: boolean;
   width?: number;
   height?: number;
+  x?: number;
+  y?: number;
+  screenX?: number;
+  screenY?: number;
+  button?: number;
+  buttons?: number;
+  value?: string;
+  inputType?: string;
+  data?: string | null;
 }
+
+const EVENT_TYPE_MAP: Record<string, EventType> = {
+  mouseDown: EventType.MouseDown,
+  mouseUp: EventType.MouseUp,
+  click: EventType.Click,
+  keyDown: EventType.KeyDown,
+  keyUp: EventType.KeyUp,
+  input: EventType.Input,
+  focus: EventType.Focus,
+  blur: EventType.Blur,
+};
 
 (globalThis as unknown as any).__uzumaki_on_app_event__ = function (
   event: AppEvent,
-) {
-  switch (event.type) {
-    case 'mouseDown':
-      if (event.nodeId != null) {
-        eventManager.onRawEvent(EventType.MouseDown, event.nodeId, event);
-      }
-      break;
-    case 'mouseUp':
-      if (event.nodeId != null) {
-        eventManager.onRawEvent(EventType.MouseUp, event.nodeId, event);
-      }
-      break;
-    case 'click':
-      if (event.nodeId != null) {
-        eventManager.onRawEvent(EventType.Click, event.nodeId, event);
-      }
-      break;
-    case 'keyDown':
-      eventManager.onRawEvent(EventType.KeyDown, null, event);
-      break;
-    case 'keyUp':
-      eventManager.onRawEvent(EventType.KeyUp, null, event);
-      break;
-    case 'input':
-      if (event.nodeId != null) {
-        eventManager.onRawEvent(EventType.Input, event.nodeId, event);
-      }
-      break;
-    case 'focus':
-      if (event.nodeId != null) {
-        eventManager.onRawEvent(EventType.Focus, event.nodeId, event);
-      }
-      break;
-    case 'blur':
-      if (event.nodeId != null) {
-        eventManager.onRawEvent(EventType.Blur, event.nodeId, event);
-      }
-      break;
-    case 'resize':
-      break;
-    case 'hotReload':
-      // todo this doesnt work :p
-      console.log('[uzumaki] Hot reload');
-      break;
+): boolean {
+  // WindowLoad is a special event dispatched directly to window handlers
+  if (event.type === 'windowLoad') {
+    eventManager.dispatchWindowEvent(
+      event.windowId,
+      EventType.WindowLoad,
+      event,
+    );
+    return false;
   }
+
+  if (event.type === 'hotReload') {
+    console.log('[uzumaki] Hot reload');
+    return false;
+  }
+
+  if (event.type === 'resize') {
+    // todo: dispatch resize event to window handlers
+    return false;
+  }
+
+  const eventType = EVENT_TYPE_MAP[event.type];
+  if (eventType === undefined) return false;
+
+  // Always dispatch — no more nodeId guards.
+  // Events without a target node will only fire window-level handlers.
+  return eventManager.onRawEvent(
+    eventType,
+    event.windowId,
+    event.nodeId ?? null,
+    event,
+  );
 };

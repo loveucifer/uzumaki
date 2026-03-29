@@ -824,6 +824,27 @@ pub fn op_get_window_title(state: &mut OpState, #[smi] window_id: u32) -> Option
     })
 }
 
+#[op2]
+#[serde]
+pub fn op_get_ancestor_path(
+    state: &mut OpState,
+    #[smi] window_id: u32,
+    #[serde] node_id: serde_json::Value,
+) -> Vec<serde_json::Value> {
+    let nid = serde_json::from_value::<NodeId>(node_id).unwrap();
+    let app_state = state.borrow::<SharedAppState>().clone();
+    with_state(&app_state, |s| {
+        let entry = s.windows.get(&window_id).expect("window not found");
+        let mut path = Vec::new();
+        let mut current = Some(nid);
+        while let Some(id) = current {
+            path.push(serde_json::to_value(id).unwrap());
+            current = entry.dom.nodes.get(id).and_then(|n| n.parent);
+        }
+        path
+    })
+}
+
 fn sync_taffy(dom: &mut Dom, node_id: NodeId) {
     let node = &dom.nodes[node_id];
     let taffy_style = node.style.to_taffy();
@@ -866,6 +887,7 @@ extension!(
     op_get_window_width,
     op_get_window_height,
     op_get_window_title,
+    op_get_ancestor_path,
   ],
   esm_entry_point = "ext:uzumaki/00_init.js",
   esm = [ dir "core", "00_init.js" ],
@@ -1087,10 +1109,11 @@ impl Application {
         Ok(())
     }
 
-    fn dispatch_event_to_js(&mut self, event: &event_dispatch::AppEvent) {
+    /// Dispatch an event to JS. Returns true if `preventDefault()` was called.
+    fn dispatch_event_to_js(&mut self, event: &event_dispatch::AppEvent) -> bool {
         if let Err(e) = self.ensure_dispatch_fn() {
             eprintln!("[uzumaki] dispatch fn not available: {e}");
-            return;
+            return false;
         }
 
         // Clone the Global handle so we don't hold a borrow on self
@@ -1111,16 +1134,22 @@ impl Application {
             Ok(val) => val,
             Err(e) => {
                 eprintln!("[uzumaki] failed to serialize event: {e}");
-                return;
+                return false;
             }
         };
 
-        func.call(scope, undefined.into(), &[event_val]);
+        let result = func.call(scope, undefined.into(), &[event_val]);
 
         if let Some(exception) = scope.exception() {
             let error = deno_core::error::JsError::from_v8_exception(scope, exception);
             eprintln!("[uzumaki] event handler error: {error}");
+            return false;
         }
+
+        // JS returns true if defaultPrevented
+        result
+            .map(|v| v.is_true())
+            .unwrap_or(false)
     }
 }
 
@@ -1186,6 +1215,14 @@ impl ApplicationHandler<UserEvent> for Application {
                     Err(e) => eprintln!("Error creating window: {:#?}", e),
                 }
                 state.paint_window(&id);
+                drop(state);
+
+                // Emit window load event after handle is ready
+                self.dispatch_event_to_js(
+                    &event_dispatch::AppEvent::WindowLoad(
+                        event_dispatch::WindowLoadEventData { window_id: id },
+                    ),
+                );
             }
             UserEvent::RequestRedraw { id } => {
                 let state = self.app_state.borrow();
@@ -1310,31 +1347,45 @@ impl ApplicationHandler<UserEvent> for Application {
             WindowEvent::KeyboardInput {
                 event: key_event, ..
             } => {
-                let events = {
-                    let mut state = self.app_state.borrow_mut();
-                    let modifiers = state.modifiers;
+                let modifiers = self.app_state.borrow().modifiers;
 
-                    // Use and_then to flatten the WindowEntry and Handle checks
-                    state.windows.get_mut(&wid).and_then(|entry| {
-                        let WindowEntry { handle, dom, .. } = entry;
-                        let handle = handle.as_mut()?; // Early return None if handle is None
-
-                        let (redraw, key_events) = event_dispatch::handle_keyboard_input(
-                            dom, handle, wid, &key_event, modifiers,
-                        );
-
-                        if redraw {
-                            needs_redraw = true;
-                        }
-
-                        Some(key_events)
+                // 1. Build and dispatch the raw KeyDown/KeyUp event first
+                let raw_event = {
+                    let state = self.app_state.borrow();
+                    state.windows.get(&wid).and_then(|entry| {
+                        event_dispatch::build_key_event(&entry.dom, wid, &key_event, modifiers)
                     })
                 };
 
-                // If we got events back, extend the pending queue
-                if let Some(key_events) = events {
-                    for event in key_events {
-                        self.dispatch_event_to_js(&event);
+                let prevented = if let Some(ref evt) = raw_event {
+                    self.dispatch_event_to_js(evt)
+                } else {
+                    false
+                };
+
+                // 2. If not prevented, handle input-level processing (text insertion, etc.)
+                if !prevented {
+                    if let Some(event_dispatch::AppEvent::HotReload) = raw_event {
+                        // HotReload is already dispatched, nothing more to do
+                    } else {
+                        let input_events = {
+                            let mut state = self.app_state.borrow_mut();
+                            state.windows.get_mut(&wid).map(|entry| {
+                                let (redraw, events) = event_dispatch::handle_key_for_input(
+                                    &mut entry.dom, wid, &key_event, modifiers,
+                                );
+                                if redraw {
+                                    needs_redraw = true;
+                                }
+                                events
+                            })
+                        };
+
+                        if let Some(events) = input_events {
+                            for event in events {
+                                self.dispatch_event_to_js(&event);
+                            }
+                        }
                     }
                 }
             }

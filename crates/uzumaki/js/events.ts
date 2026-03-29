@@ -1,3 +1,6 @@
+import core from './core';
+import type { NodeId } from './types';
+
 export const enum EventType {
   MouseMove = 0,
   MouseDown = 1,
@@ -8,46 +11,74 @@ export const enum EventType {
   Input = 20,
   Focus = 21,
   Blur = 22,
+  WindowLoad = 30,
+}
+
+export const enum EventPhase {
+  None = 0,
+  Capture = 1,
+  Target = 2,
+  Bubble = 3,
 }
 
 export interface UzumakiEvent {
-  type: EventType;
-  target: any;
-  currentTarget: any;
-  bubbles: boolean;
-  defaultPrevented: boolean;
+  readonly type: EventType;
+  readonly target: NodeId | null;
+  currentTarget: NodeId | null;
+  readonly eventPhase: EventPhase;
+  readonly bubbles: boolean;
+  readonly defaultPrevented: boolean;
   stopPropagation(): void;
   stopImmediatePropagation(): void;
   preventDefault(): void;
 }
 
 export interface UzumakiMouseEvent extends UzumakiEvent {
-  x: number;
-  y: number;
-  screenX: number;
-  screenY: number;
-  button: number;
-  buttons: number;
+  readonly x: number;
+  readonly y: number;
+  readonly screenX: number;
+  readonly screenY: number;
+  readonly button: number;
+  readonly buttons: number;
 }
 
 export interface UzumakiKeyboardEvent extends UzumakiEvent {
-  key: string;
-  code: string;
-  keyCode: number;
-  repeat: boolean;
-  ctrlKey: boolean;
-  altKey: boolean;
-  shiftKey: boolean;
-  metaKey: boolean;
+  readonly key: string;
+  readonly code: string;
+  readonly keyCode: number;
+  readonly repeat: boolean;
+  readonly ctrlKey: boolean;
+  readonly altKey: boolean;
+  readonly shiftKey: boolean;
+  readonly metaKey: boolean;
 }
 
 export interface UzumakiInputEvent extends UzumakiEvent {
-  value: string;
-  inputType: string;
-  data: string | null;
+  readonly value: string;
+  readonly inputType: string;
+  readonly data: string | null;
 }
 
 export interface UzumakiFocusEvent extends UzumakiEvent {}
+
+export interface EventHandlerMap {
+  mousemove: UzumakiMouseEvent;
+  mousedown: UzumakiMouseEvent;
+  mouseup: UzumakiMouseEvent;
+  click: UzumakiMouseEvent;
+  keydown: UzumakiKeyboardEvent;
+  keyup: UzumakiKeyboardEvent;
+  input: UzumakiInputEvent;
+  focus: UzumakiFocusEvent;
+  blur: UzumakiFocusEvent;
+  windowload: UzumakiEvent;
+}
+
+export type EventName = keyof EventHandlerMap;
+
+export type EventHandler<K extends EventName = EventName> = (
+  event: EventHandlerMap[K],
+) => void;
 
 const EVENT_NAME_TO_TYPE: Record<string, EventType> = {
   mousemove: EventType.MouseMove,
@@ -59,7 +90,17 @@ const EVENT_NAME_TO_TYPE: Record<string, EventType> = {
   input: EventType.Input,
   focus: EventType.Focus,
   blur: EventType.Blur,
+  windowload: EventType.WindowLoad,
 };
+
+export { EVENT_NAME_TO_TYPE };
+
+/** Events that do NOT bubble (browser convention). */
+const NON_BUBBLING: Set<EventType> = new Set([
+  EventType.Focus,
+  EventType.Blur,
+  EventType.WindowLoad,
+]);
 
 function nodeKey(id: any): string {
   return JSON.stringify(id);
@@ -81,162 +122,308 @@ function isFocusType(t: EventType): boolean {
   return t === EventType.Focus || t === EventType.Blur;
 }
 
+interface HandlerEntry {
+  handler: Function;
+  capture: boolean;
+}
+
+type NodeHandlers = Map<EventType, HandlerEntry[]>;
+
 export class EventManager {
-  // nodeKey -> EventType -> Set<handler>
-  private handlers = new Map<string, Map<EventType, Set<Function>>>();
-  // nodeKey -> raw parentNodeId (for bubbling / capture path)
-  private parentMap = new Map<string, any>();
-  // focus tracking
-  private _focusNode: any = null;
+  /** nodeKey -> EventType -> HandlerEntry[] */
+  private handlers = new Map<string, NodeHandlers>();
 
-  setFocus(nodeId: any): void {
-    this._focusNode = nodeId;
-  }
+  /** windowId (number) -> EventType -> HandlerEntry[] */
+  private windowHandlers = new Map<number, Map<EventType, HandlerEntry[]>>();
 
-  getFocus(): any {
-    return this._focusNode;
-  }
-
-  // ── Handler registry ─────────────────────────────────────────────
-
-  addHandler(nodeId: any, eventType: EventType, handler: Function): void {
+  addHandler(
+    nodeId: NodeId,
+    eventType: EventType,
+    handler: Function,
+    capture = false,
+  ): void {
     const key = nodeKey(nodeId);
     let typeMap = this.handlers.get(key);
     if (!typeMap) {
       typeMap = new Map();
       this.handlers.set(key, typeMap);
     }
-    let set = typeMap.get(eventType);
-    if (!set) {
-      set = new Set();
-      typeMap.set(eventType, set);
+    let entries = typeMap.get(eventType);
+    if (!entries) {
+      entries = [];
+      typeMap.set(eventType, entries);
     }
-    set.add(handler);
+    entries.push({ handler, capture });
   }
 
-  removeHandler(nodeId: any, eventType: EventType, handler: Function): void {
+  removeHandler(
+    nodeId: NodeId,
+    eventType: EventType,
+    handler: Function,
+    capture = false,
+  ): void {
     const key = nodeKey(nodeId);
     const typeMap = this.handlers.get(key);
     if (!typeMap) return;
-    const set = typeMap.get(eventType);
-    if (!set) return;
-    set.delete(handler);
-    if (set.size === 0) typeMap.delete(eventType);
+    const entries = typeMap.get(eventType);
+    if (!entries) return;
+    const idx = entries.findIndex(
+      (e) => e.handler === handler && e.capture === capture,
+    );
+    if (idx >= 0) entries.splice(idx, 1);
+    if (entries.length === 0) typeMap.delete(eventType);
     if (typeMap.size === 0) this.handlers.delete(key);
   }
 
-  clearHandlersForType(nodeId: any, eventType: EventType): void {
-    const key = nodeKey(nodeId);
-    const typeMap = this.handlers.get(key);
-    if (!typeMap) return;
-    typeMap.delete(eventType);
-    if (typeMap.size === 0) this.handlers.delete(key);
+  clearNode(nodeId: NodeId): void {
+    this.handlers.delete(nodeKey(nodeId));
   }
 
-  clearNode(nodeId: any): void {
-    const key = nodeKey(nodeId);
-    this.handlers.delete(key);
-    this.parentMap.delete(key);
-    if (this._focusNode != null && nodeKey(this._focusNode) === key) {
-      this._focusNode = null;
-    }
-  }
-
-  hasHandlers(nodeId: any): boolean {
+  hasHandlers(nodeId: NodeId): boolean {
     const typeMap = this.handlers.get(nodeKey(nodeId));
     return typeMap != null && typeMap.size > 0;
   }
 
-  setParent(childId: any, parentId: any): void {
-    this.parentMap.set(nodeKey(childId), parentId);
-  }
-
-  removeParent(childId: any): void {
-    this.parentMap.delete(nodeKey(childId));
-  }
-
-  // ── Convenience: string event name <-> EventType ───────────────────
-
-  addHandlerByName(nodeId: any, eventName: string, handler: Function): void {
+  addHandlerByName(
+    nodeId: NodeId,
+    eventName: string,
+    handler: Function,
+    capture = false,
+  ): void {
     const t = EVENT_NAME_TO_TYPE[eventName];
-    if (t !== undefined) this.addHandler(nodeId, t, handler);
+    if (t !== undefined) this.addHandler(nodeId, t, handler, capture);
   }
 
-  removeHandlerByName(nodeId: any, eventName: string, handler: Function): void {
+  removeHandlerByName(
+    nodeId: NodeId,
+    eventName: string,
+    handler: Function,
+    capture = false,
+  ): void {
     const t = EVENT_NAME_TO_TYPE[eventName];
-    if (t !== undefined) this.removeHandler(nodeId, t, handler);
+    if (t !== undefined) this.removeHandler(nodeId, t, handler, capture);
   }
 
-  clearHandlersByName(nodeId: any, eventName: string): void {
+  clearHandlersByName(nodeId: NodeId, eventName: string): void {
+    const key = nodeKey(nodeId);
+    const typeMap = this.handlers.get(key);
+    if (!typeMap) return;
     const t = EVENT_NAME_TO_TYPE[eventName];
-    if (t !== undefined) this.clearHandlersForType(nodeId, t);
-  }
-
-  // ── Build ancestor path (target -> root) for capture/bubble ──────
-
-  private buildPath(targetId: any): any[] {
-    const path: any[] = [];
-    let currentId: any = targetId;
-    while (currentId != null) {
-      path.push(currentId);
-      currentId = this.parentMap.get(nodeKey(currentId)) ?? null;
+    if (t !== undefined) {
+      typeMap.delete(t);
+      if (typeMap.size === 0) this.handlers.delete(key);
     }
-    return path;
   }
 
-  onRawEvent(type: EventType, targetNodeId: any, payload: any): void {
-    let target = targetNodeId;
-
-    // Keyboard events route to the focus node
-    if (isKeyboardType(type)) {
-      target = this._focusNode;
-      if (target == null) return;
+  addWindowHandler(
+    windowId: number,
+    eventType: EventType,
+    handler: Function,
+    capture = false,
+  ): void {
+    let typeMap = this.windowHandlers.get(windowId);
+    if (!typeMap) {
+      typeMap = new Map();
+      this.windowHandlers.set(windowId, typeMap);
     }
+    let entries = typeMap.get(eventType);
+    if (!entries) {
+      entries = [];
+      typeMap.set(eventType, entries);
+    }
+    entries.push({ handler, capture });
+  }
 
-    // Build path: [target, parent, ..., root]
-    const path = this.buildPath(target);
+  removeWindowHandler(
+    windowId: number,
+    eventType: EventType,
+    handler: Function,
+    capture = false,
+  ): void {
+    const typeMap = this.windowHandlers.get(windowId);
+    if (!typeMap) return;
+    const entries = typeMap.get(eventType);
+    if (!entries) return;
+    const idx = entries.findIndex(
+      (e) => e.handler === handler && e.capture === capture,
+    );
+    if (idx >= 0) entries.splice(idx, 1);
+    if (entries.length === 0) typeMap.delete(eventType);
+    if (typeMap.size === 0) this.windowHandlers.delete(windowId);
+  }
 
-    // Build the event object
+  clearWindowHandlers(windowId: number): void {
+    this.windowHandlers.delete(windowId);
+  }
+
+  addWindowHandlerByName(
+    windowId: number,
+    eventName: string,
+    handler: Function,
+    capture = false,
+  ): void {
+    const t = EVENT_NAME_TO_TYPE[eventName];
+    if (t !== undefined) this.addWindowHandler(windowId, t, handler, capture);
+  }
+
+  removeWindowHandlerByName(
+    windowId: number,
+    eventName: string,
+    handler: Function,
+    capture = false,
+  ): void {
+    const t = EVENT_NAME_TO_TYPE[eventName];
+    if (t !== undefined)
+      this.removeWindowHandler(windowId, t, handler, capture);
+  }
+
+  private fireHandlers(
+    key: string,
+    type: EventType,
+    event: UzumakiEvent,
+    capturePhase: boolean,
+  ): { stopped: boolean; stoppedImmediate: boolean } {
     let stopped = false;
     let stoppedImmediate = false;
-    let prevented = false;
 
-    const base = {
+    const typeMap = this.handlers.get(key);
+    if (!typeMap) return { stopped, stoppedImmediate };
+    const entries = typeMap.get(type);
+    if (!entries) return { stopped, stoppedImmediate };
+
+    for (const entry of entries) {
+      // During target phase, fire all handlers regardless of capture flag
+      if (
+        event.eventPhase === EventPhase.Target ||
+        entry.capture === capturePhase
+      ) {
+        entry.handler(event);
+        // Check after each handler
+        if ((event as any)._stoppedImmediate) {
+          stoppedImmediate = true;
+          stopped = true;
+          break;
+        }
+        if ((event as any)._stopped) {
+          stopped = true;
+        }
+      }
+    }
+
+    return { stopped, stoppedImmediate };
+  }
+
+  private fireWindowHandlers(
+    windowId: number,
+    type: EventType,
+    event: UzumakiEvent,
+    capturePhase: boolean,
+  ): { stopped: boolean; stoppedImmediate: boolean } {
+    let stopped = false;
+    let stoppedImmediate = false;
+
+    const typeMap = this.windowHandlers.get(windowId);
+    if (!typeMap) return { stopped, stoppedImmediate };
+    const entries = typeMap.get(type);
+    if (!entries) return { stopped, stoppedImmediate };
+
+    for (const entry of entries) {
+      if (entry.capture === capturePhase) {
+        entry.handler(event);
+        if ((event as any)._stoppedImmediate) {
+          stoppedImmediate = true;
+          stopped = true;
+          break;
+        }
+        if ((event as any)._stopped) {
+          stopped = true;
+        }
+      }
+    }
+
+    return { stopped, stoppedImmediate };
+  }
+
+  /**
+   * Dispatch an event through the capture → target → bubble phases.
+   * Returns true if `preventDefault()` was called.
+   */
+  onRawEvent(
+    type: EventType,
+    windowId: number,
+    targetNodeId: NodeId | null,
+    payload: any,
+  ): boolean {
+    const bubbles = !NON_BUBBLING.has(type);
+
+    // Build path from Rust DOM tree (target → root)
+    let path: any[] = [];
+    if (targetNodeId != null) {
+      path = core.getAncestorPath(windowId, targetNodeId);
+    }
+
+    // Build the event object
+    let _stopped = false;
+    let _stoppedImmediate = false;
+    let _prevented = false;
+    let _eventPhase: EventPhase = EventPhase.None;
+
+    const base: UzumakiEvent = {
       type,
-      target,
-      currentTarget: target,
-      bubbles: true,
-      get defaultPrevented() {
-        return prevented;
+      target: targetNodeId,
+      currentTarget: targetNodeId,
+      get eventPhase(): EventPhase {
+        return _eventPhase;
+      },
+      bubbles,
+      get defaultPrevented(): boolean {
+        return _prevented;
       },
       stopPropagation() {
-        stopped = true;
+        _stopped = true;
       },
       stopImmediatePropagation() {
-        stopped = true;
-        stoppedImmediate = true;
+        _stopped = true;
+        _stoppedImmediate = true;
       },
       preventDefault() {
-        prevented = true;
+        _prevented = true;
       },
     };
 
+    // Expose internal flags for fireHandlers to read
+    (base as any)._stopped = false;
+    (base as any)._stoppedImmediate = false;
+
+    // Wrap stopPropagation to also set internal flags
+    const origStop = base.stopPropagation;
+    base.stopPropagation = function () {
+      _stopped = true;
+      (base as any)._stopped = true;
+    };
+    const origStopImmediate = base.stopImmediatePropagation;
+    base.stopImmediatePropagation = function () {
+      _stopped = true;
+      _stoppedImmediate = true;
+      (base as any)._stopped = true;
+      (base as any)._stoppedImmediate = true;
+    };
+
+    // Enrich event with type-specific fields
     let event: UzumakiEvent;
 
     if (isMouseType(type)) {
-      event = {
-        ...base,
+      event = Object.assign(base, {
         x: payload?.x ?? 0,
         y: payload?.y ?? 0,
         screenX: payload?.screenX ?? 0,
         screenY: payload?.screenY ?? 0,
         button: payload?.button ?? 0,
         buttons: payload?.buttons ?? 0,
-      } as UzumakiMouseEvent;
+      }) as UzumakiMouseEvent;
     } else if (isKeyboardType(type)) {
       const mods: number = payload?.modifiers ?? 0;
-      event = {
-        ...base,
+      event = Object.assign(base, {
         key: payload?.key ?? '',
         code: payload?.code ?? '',
         keyCode: payload?.keyCode ?? 0,
@@ -245,51 +432,109 @@ export class EventManager {
         altKey: !!(mods & 2),
         shiftKey: !!(mods & 4),
         metaKey: !!(mods & 8),
-      } as UzumakiKeyboardEvent;
+      }) as UzumakiKeyboardEvent;
     } else if (isInputType(type)) {
-      event = {
-        ...base,
+      event = Object.assign(base, {
         value: payload?.value ?? '',
         inputType: payload?.inputType ?? '',
         data: payload?.data ?? null,
-      } as UzumakiInputEvent;
+      }) as UzumakiInputEvent;
     } else if (isFocusType(type)) {
       event = base as UzumakiFocusEvent;
     } else {
-      return;
+      // WindowLoad and others
+      event = base;
     }
 
-    // ── Capture phase: root -> target ────────────────────────────────
-    // (Currently no capture listeners registered, but the path is walked
-    // so future capture support is trivial.)
+    // ── No DOM target (e.g. click on empty space) ─────────────────
+    if (path.length === 0) {
+      _eventPhase = EventPhase.Bubble;
+      event.currentTarget = null;
+      this.fireWindowHandlers(windowId, type, event, false);
+      return _prevented;
+    }
 
-    // ── Target phase + Bubble phase: target -> root ─────────────────
-    for (const nodeId of path) {
-      if (stopped) break;
-      event.currentTarget = nodeId;
+    // ── CAPTURE PHASE: window → root → ... → target ───────────────
+    _eventPhase = EventPhase.Capture;
 
-      const key = nodeKey(nodeId);
-      const typeMap = this.handlers.get(key);
-      if (typeMap) {
-        const handlers = typeMap.get(type);
-        if (handlers) {
-          for (const h of handlers) {
-            h(event);
-            if (stoppedImmediate) break;
-          }
-        }
+    // Window capture handlers fire first
+    if (!_stopped) {
+      event.currentTarget = null;
+      const res = this.fireWindowHandlers(windowId, type, event, true);
+      if (res.stopped) _stopped = true;
+    }
+
+    // Walk path in reverse (root → target) for capture
+    for (let i = path.length - 1; i > 0 && !_stopped; i--) {
+      event.currentTarget = path[i];
+      const res = this.fireHandlers(nodeKey(path[i]), type, event, true);
+      if (res.stopped) _stopped = true;
+    }
+
+    // ── TARGET PHASE ──────────────────────────────────────────────
+    if (!_stopped) {
+      _eventPhase = EventPhase.Target;
+      event.currentTarget = path[0];
+      const res = this.fireHandlers(
+        nodeKey(path[0]),
+        type,
+        event,
+        false, // doesn't matter for target phase — fireHandlers fires all
+      );
+      if (res.stopped) _stopped = true;
+    }
+
+    // ── BUBBLE PHASE: target → ... → root → window ───────────────
+    if (bubbles && !_stopped) {
+      _eventPhase = EventPhase.Bubble;
+
+      // Walk from parent of target up to root
+      for (let i = 1; i < path.length && !_stopped; i++) {
+        event.currentTarget = path[i];
+        const res = this.fireHandlers(nodeKey(path[i]), type, event, false);
+        if (res.stopped) _stopped = true;
       }
 
-      if (!event.bubbles) break;
+      // Window bubble handlers fire last
+      if (!_stopped) {
+        event.currentTarget = null;
+        this.fireWindowHandlers(windowId, type, event, false);
+      }
+    }
+
+    return _prevented;
+  }
+
+  dispatchWindowEvent(windowId: number, type: EventType, payload: any): void {
+    let _prevented = false;
+    const event: UzumakiEvent = {
+      type,
+      target: null,
+      currentTarget: null,
+      eventPhase: EventPhase.Target,
+      bubbles: false,
+      get defaultPrevented(): boolean {
+        return _prevented;
+      },
+      stopPropagation() {},
+      stopImmediatePropagation() {},
+      preventDefault() {
+        _prevented = true;
+      },
+    };
+
+    const typeMap = this.windowHandlers.get(windowId);
+    if (!typeMap) return;
+    const entries = typeMap.get(type);
+    if (!entries) return;
+    for (const entry of entries) {
+      entry.handler(event);
     }
   }
 
-  // ── Reset ────────────────────────────────────────────────────────
-
   clear(): void {
     this.handlers.clear();
-    this.parentMap.clear();
-    this._focusNode = null;
+    this.windowHandlers.clear();
   }
 }
 
