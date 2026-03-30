@@ -349,8 +349,12 @@ abstract class BaseElement {
   }
 
   destroy(): void {
+    for (const child of this.children) {
+      child.destroy();
+    }
     eventManager.clearNode(this.id);
     this.eventListeners.clear();
+    this.children = [];
   }
 }
 

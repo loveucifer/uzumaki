@@ -393,9 +393,24 @@ impl Dom {
             self.nodes[parent_id].last_child = prev;
         }
 
-        self.nodes[child_id].parent = None;
-        self.nodes[child_id].prev_sibling = None;
-        self.nodes[child_id].next_sibling = None;
+        // Collect the entire subtree rooted at child_id (BFS)
+        let mut to_remove = Vec::new();
+        let mut stack = vec![child_id];
+        while let Some(nid) = stack.pop() {
+            to_remove.push(nid);
+            let mut c = self.nodes[nid].first_child;
+            while let Some(cid) = c {
+                stack.push(cid);
+                c = self.nodes[cid].next_sibling;
+            }
+        }
+
+        // Free taffy nodes + slotmap entries
+        for nid in to_remove {
+            let tn = self.nodes[nid].taffy_node;
+            let _ = self.taffy.remove(tn);
+            self.nodes.remove(nid);
+        }
     }
 
     /// Update a text node's content.
