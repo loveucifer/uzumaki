@@ -21,9 +21,9 @@ deno_runtime = "0.249.0"
 deno_core = "0.394.0"
 
 
-[profile.release]
-lto = "thin"
-strip = "symbols"
+# [profile.release]
+# lto = "thin"
+# strip = "symbols"
 
 [profile.dist]
 inherits = "release"

@@ -1002,7 +1002,7 @@ impl Application {
             skip_op_registration: false,
             bootstrap: BootstrapOptions {
                 args: vec![],
-                mode: deno_runtime::WorkerExecutionMode::Run,
+                mode: deno_runtime::WorkerExecutionMode::None,
                 ..Default::default()
             },
             ..Default::default()
