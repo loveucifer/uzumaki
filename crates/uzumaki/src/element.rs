@@ -10,7 +10,7 @@ use vello::peniko::{Color as VelloColor, Fill};
 use crate::elements::input::{InputRenderInfo, compute_selection_rects};
 use crate::input::InputState;
 use crate::interactivity::{HitTestState, HitboxStore, Interactivity};
-use crate::selection::SelectionRange;
+use crate::selection::{DomSelection, SelectionRange};
 use crate::style::{Bounds, Color, Style};
 use crate::text::TextRenderer;
 
@@ -88,47 +88,6 @@ pub struct TextSelectRun {
     pub entries: Vec<TextRunEntry>,
     pub flat_text: String,
     pub total_graphemes: usize,
-}
-
-/// Selection state for text within a textSelect view.
-pub struct DomSelection {
-    /// The textSelect root that owns this selection.
-    pub root: NodeId,
-    pub range: SelectionRange,
-}
-
-impl DomSelection {
-    pub fn new(root: NodeId, anchor: usize, active: usize) -> Self {
-        Self {
-            root,
-            range: SelectionRange { anchor, active },
-        }
-    }
-    #[inline]
-    pub fn anchor(&self) -> usize {
-        self.range.anchor
-    }
-
-    #[inline]
-    pub fn active(&self) -> usize {
-        self.range.active
-    }
-
-    pub fn set_cursor(&mut self, pos: usize) {
-        self.range.set_cursor(pos);
-    }
-
-    pub fn start(&self) -> usize {
-        self.range.anchor.min(self.range.active)
-    }
-
-    pub fn end(&self) -> usize {
-        self.range.anchor.max(self.range.active)
-    }
-
-    pub fn is_collapsed(&self) -> bool {
-        self.range.anchor == self.range.active
-    }
 }
 
 // ── Element trait ──────────────────────────────────────────────────────
@@ -235,7 +194,7 @@ pub struct Dom {
     pub hitbox_store: HitboxStore,
     /// Current hit test state (updated on mouse move).
     pub hit_state: HitTestState,
-    /// Currently focused input node.
+    /// Currently focuswsed ndoe
     pub focused_node: Option<NodeId>,
     // oh god please move this to input state
     /// Input node being dragged for selection.
