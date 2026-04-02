@@ -102,7 +102,7 @@ pub fn scroll_input_to_cursor(dom: &mut Dom, handle: &mut Window) {
             let input_padding = if padding > 0.0 { padding } else { 8.0 };
             let pt = node.style.padding.top;
             let top_pad = if pt > 0.0 { pt } else { 4.0 };
-            let cursor_pos = is.range.active;
+            let cursor_pos = is.range().active;
             let taffy_node = node.taffy_node;
             let multiline = is.multiline;
             (
@@ -279,7 +279,9 @@ pub fn handle_cursor_moved(
 
                 if let Some(node) = dom.nodes.get_mut(drag_nid) {
                     if let Some(is) = node.behavior.as_input_mut() {
-                        is.range.active = grapheme_idx;
+                        is.update_range(|range| {
+                            range.active = grapheme_idx;
+                        });
                         is.reset_blink();
                     }
                 }
@@ -676,7 +678,7 @@ pub fn handle_mouse_input(
                                     }
                                     _ => {
                                         // Single click: place cursor
-                                        is.range.set_cursor(grapheme_idx);
+                                        is.set_cursor(grapheme_idx);
                                     }
                                 }
                                 is.reset_blink();

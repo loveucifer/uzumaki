@@ -8,11 +8,13 @@ use vello::kurbo::{Affine, Rect, RoundedRect, RoundedRectRadii};
 use vello::peniko::{Color as VelloColor, Fill};
 
 use crate::elements::input::{InputRenderInfo, compute_selection_rects};
-use crate::input::InputState;
+use crate::input::{BaseInputState, DefaultRangeProvider};
 use crate::interactivity::{HitTestState, HitboxStore, Interactivity};
 use crate::selection::{DomSelection, SelectionRange};
 use crate::style::{Bounds, Color, Style};
 use crate::text::TextRenderer;
+
+pub type InputState = BaseInputState<DefaultRangeProvider>;
 
 new_key_type! {
     pub struct NodeId;
@@ -143,7 +145,9 @@ impl InputBehavior {
     }
 
     pub fn new_single_line() -> Self {
-        Self::new(InputState::new(false))
+        let mut state = InputState::default();
+        state.multiline = false;
+        Self::new(state)
     }
 }
 
@@ -692,19 +696,22 @@ impl Dom {
                             )
                         });
 
-                        let input = node.behavior.as_input().map(|is| InputRenderInfo {
-                            display_text: is.display_text(),
-                            placeholder: is.placeholder.clone(),
-                            font_size: computed_style.text.font_size,
-                            text_color: computed_style.text.color,
-                            focused: is.focused,
-                            sel_start: is.range.start(),
-                            sel_end: is.range.end(),
-                            cursor_pos: is.range.active,
-                            scroll_offset: is.scroll_offset,
-                            scroll_offset_y: is.scroll_offset_y,
-                            blink_visible: is.blink_visible(self.window_focused),
-                            multiline: is.multiline,
+                        let input = node.behavior.as_input().map(|is| {
+                            let range = is.range();
+                            InputRenderInfo {
+                                display_text: is.display_text(),
+                                placeholder: is.placeholder.clone(),
+                                font_size: computed_style.text.font_size,
+                                text_color: computed_style.text.color,
+                                focused: is.focused,
+                                sel_start: range.start(),
+                                sel_end: range.end(),
+                                cursor_pos: range.active,
+                                scroll_offset: is.scroll_offset,
+                                scroll_offset_y: is.scroll_offset_y,
+                                blink_visible: is.blink_visible(self.window_focused),
+                                multiline: is.multiline,
+                            }
                         });
 
                         // Text nodes inside textSelect views need hitboxes for click-to-select
@@ -1399,7 +1406,7 @@ impl Dom {
                 if let Some(is) = node.behavior.as_input() {
                     self.selection = Some(DomSelection {
                         root: nid,
-                        range: is.range.clone(),
+                        range: is.range(),
                     });
                 }
             }

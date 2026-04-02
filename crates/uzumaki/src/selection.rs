@@ -1,6 +1,6 @@
 use crate::element::NodeId;
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct SelectionRange {
     /// Anchor point (where selection started), flat grapheme index
     pub anchor: usize,
