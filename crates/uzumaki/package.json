@@ -20,6 +20,12 @@
   "napi": {
     "binaryName": "uzumaki"
   },
+  "files": [
+    "cli/**/*",
+    "README.md",
+    "bin/**/*",
+    "js/**/*"
+  ],
   "scripts": {
     "start": "bun js/index.js",
     "build": "napi build --release --platform -o ./js/bindings",

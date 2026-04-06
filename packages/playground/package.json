@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "uzumaki src/index.tsx",
-    "build": "bun build src/index.tsx --target node --outdir dist",
+    "build": "bun build src/index.tsx --target node --outdir dist --minify",
     "preview": "uzumaki dist/index.js"
   },
   "devDependencies": {
