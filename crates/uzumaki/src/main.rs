@@ -1641,6 +1641,10 @@ fn main() {
         std::env::set_var("WGPU_POWER_PREF", "high");
     }
 
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("failed to install rustls crypto provider");
+
     // Standalone-first: if the current executable carries an embedded payload,
     // always run it, ignoring any CLI args. This is what enables a
     // double-clicked `MyApp.exe` to "just work".

@@ -9054,6 +9054,7 @@ dependencies = [
  "node_resolver",
  "pollster",
  "refineable",
+ "rustls",
  "serde",
  "serde_json",
  "slotmap",
