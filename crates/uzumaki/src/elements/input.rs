@@ -136,7 +136,7 @@ pub(crate) fn compute_selection_rects(
     positions: &[GlyphPos2D],
     sel_start: usize,
     sel_end: usize,
-    text_w: f64,
+    _text_w: f64,
     line_height: f64,
 ) -> Vec<[f64; 4]> {
     if sel_start >= sel_end || positions.is_empty() {
@@ -161,13 +161,18 @@ pub(crate) fn compute_selection_rects(
 
     for (idx, &ly) in line_ys.iter().enumerate() {
         let y = ly as f64;
+        let line_end_x = positions
+            .iter()
+            .filter(|pos| (pos.y - ly).abs() < 1.0)
+            .map(|pos| pos.x as f64)
+            .fold(0.0, f64::max);
 
         let (x1, x2) = if num_lines == 1 {
             // Single visual line — exact start-to-end
             (start_x, end_x)
         } else if idx == 0 {
-            // First line: from selection start to right edge
-            (start_x, text_w)
+            // First line: from selection start to the line's rendered extent
+            (start_x, line_end_x)
         } else if idx == num_lines - 1 {
             // Last line: from left edge to selection end
             if end_x < 1.0 {
@@ -177,11 +182,9 @@ pub(crate) fn compute_selection_rects(
                 (0.0, end_x)
             }
         } else {
-            // Middle line: full width, or stub for empty lines
-            let has_content = (sel_start..=sel_end_idx)
-                .any(|i| (positions[i].y - ly).abs() < 1.0 && positions[i].x > 1.0);
-            if has_content {
-                (0.0, text_w)
+            // Middle line: clamp to the line's rendered extent, or stub for empty lines
+            if line_end_x > 1.0 {
+                (0.0, line_end_x)
             } else {
                 (0.0, 8.0)
             }
@@ -521,8 +524,8 @@ mod tests {
         ];
         let rects = compute_selection_rects(&positions, 1, 4, 200.0, 20.0);
         assert_eq!(rects.len(), 2);
-        // First line: start_x=10 to text_w=200
-        assert_eq!(rects[0], [10.0, 0.0, 200.0, 20.0]);
+        // First line: start_x=10 to the rendered end of line 0
+        assert_eq!(rects[0], [10.0, 0.0, 20.0, 20.0]);
         // Last line: 0 to end_x=10
         assert_eq!(rects[1], [0.0, 20.0, 10.0, 40.0]);
     }
@@ -539,10 +542,10 @@ mod tests {
         ];
         let rects = compute_selection_rects(&positions, 0, 5, 200.0, 20.0);
         assert_eq!(rects.len(), 3);
-        // First line → right edge
-        assert_eq!(rects[0], [0.0, 0.0, 200.0, 20.0]);
-        // Middle line → full width (has content at x=15)
-        assert_eq!(rects[1], [0.0, 20.0, 200.0, 40.0]);
+        // First line → rendered end of line 0
+        assert_eq!(rects[0], [0.0, 0.0, 10.0, 20.0]);
+        // Middle line → rendered end of line 1
+        assert_eq!(rects[1], [0.0, 20.0, 15.0, 40.0]);
         // Last line → left to end_x
         assert_eq!(rects[2], [0.0, 40.0, 10.0, 60.0]);
     }
@@ -559,8 +562,8 @@ mod tests {
         ];
         let rects = compute_selection_rects(&positions, 0, 4, 200.0, 20.0);
         assert_eq!(rects.len(), 2);
-        // First line full width
-        assert_eq!(rects[0], [0.0, 0.0, 200.0, 20.0]);
+        // First line ends at the rendered end of line 0
+        assert_eq!(rects[0], [0.0, 0.0, 30.0, 20.0]);
         // Last line: stub (end_x < 1.0)
         assert_eq!(rects[1], [0.0, 20.0, 8.0, 40.0]);
     }
@@ -577,7 +580,7 @@ mod tests {
         ];
         let rects = compute_selection_rects(&positions, 0, 4, 200.0, 20.0);
         assert_eq!(rects.len(), 3);
-        assert_eq!(rects[0], [0.0, 0.0, 200.0, 20.0]); // first line
+        assert_eq!(rects[0], [0.0, 0.0, 10.0, 20.0]); // first line
         assert_eq!(rects[1], [0.0, 20.0, 8.0, 40.0]); // empty middle → stub
         assert_eq!(rects[2], [0.0, 40.0, 10.0, 60.0]); // last line
     }
