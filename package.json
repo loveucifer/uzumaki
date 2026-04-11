@@ -7,10 +7,24 @@
     "dev": "pnpm build:core && pnpm --filter playground dev",
     "build:core": "cargo build --release -p uzumaki",
     "copy:artifacts": "bun scripts/copy-artifacts.ts",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs}": [
+      "prettier --ignore-unknown --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "*.rs": [
+      "cargo fmt --"
+    ]
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.8.1"
   },
   "peerDependencies": {
