@@ -38,16 +38,16 @@ type LoadedConfig = {
 
 function color(text: string, value: string) {
   const start = Bun.color(value, 'ansi') ?? '';
-  const reset = start ? '\x1b[0m' : '';
+  const reset = start ? '\u001B[0m' : '';
   return `${start}${text}${reset}`;
 }
 
 function bold(text: string) {
-  return `\x1b[1m${text}\x1b[22m`;
+  return `\u001B[1m${text}\u001B[22m`;
 }
 
 function dim(text: string) {
-  return `\x1b[2m${text}\x1b[22m`;
+  return `\u001B[2m${text}\u001B[22m`;
 }
 
 const args = process.argv.slice(2);
@@ -108,10 +108,12 @@ const require = createRequire(import.meta.url);
 
 function getBinaryName() {
   switch (process.platform) {
-    case 'win32':
+    case 'win32': {
       return 'uzumaki.exe';
-    default:
+    }
+    default: {
       return 'uzumaki';
+    }
   }
 }
 
@@ -205,61 +207,70 @@ function parseBuildArgs(rawArgs: string[]): BuildCliOptions {
     const next = rawArgs[i + 1];
 
     switch (arg) {
-      case '--config':
+      case '--config': {
         if (!next) {
           throw new Error('--config requires a path');
         }
         options.configPath = next;
         i += 1;
         break;
-      case '--build-command':
+      }
+      case '--build-command': {
         if (!next) {
           throw new Error('--build-command requires a value');
         }
         options.buildCommand = next;
         i += 1;
         break;
-      case '--dist':
+      }
+      case '--dist': {
         if (!next) {
           throw new Error('--dist requires a value');
         }
         options.dist = next;
         i += 1;
         break;
-      case '--entry':
+      }
+      case '--entry': {
         if (!next) {
           throw new Error('--entry requires a value');
         }
         options.entry = next;
         i += 1;
         break;
+      }
       case '--output':
-      case '-o':
+      case '-o': {
         if (!next) {
           throw new Error(`${arg} requires a value`);
         }
         options.output = next;
         i += 1;
         break;
-      case '--name':
+      }
+      case '--name': {
         if (!next) {
           throw new Error('--name requires a value');
         }
         options.name = next;
         i += 1;
         break;
-      case '--base-binary':
+      }
+      case '--base-binary': {
         if (!next) {
           throw new Error('--base-binary requires a value');
         }
         options.baseBinary = next;
         i += 1;
         break;
-      case '--no-build':
+      }
+      case '--no-build': {
         options.shouldRunBuild = false;
         break;
-      default:
+      }
+      default: {
         throw new Error(`unknown build arg: ${arg}`);
+      }
     }
   }
 
@@ -473,7 +484,7 @@ async function buildApp(rawArgs: string[]) {
 }
 
 async function main() {
-  if (!args.length) {
+  if (args.length === 0) {
     help();
     return 0;
   }
@@ -490,11 +501,13 @@ async function main() {
       return await run(entryPoint, args.slice(2));
     }
 
-    case 'build':
+    case 'build': {
       return await buildApp(args.slice(1));
+    }
 
-    default:
+    default: {
       return await run(cmd, args.slice(1));
+    }
   }
 }
 

@@ -1,8 +1,9 @@
-import ReactReconciler, { type EventPriority } from 'react-reconciler';
 import { isValidElement as isReactElement } from 'react';
-
+import ReactReconciler, { type EventPriority } from 'react-reconciler';
 import { DefaultEventPriority } from 'react-reconciler/constants.js'; // fixme our runtime doesnt do probing for imports
+
 import type { JSX } from './jsx/runtime';
+
 import core, { PropKey } from '../core';
 import { eventManager } from '../events';
 import { Window } from '../window';
@@ -97,10 +98,10 @@ function toLength(value: any): { value: number; unit: number } {
   if (typeof value === 'number') return { value, unit: 0 };
   const s = String(value);
   if (s === 'auto') return { value: 0, unit: 3 };
-  if (s === 'full') return { value: 1.0, unit: 1 };
-  if (s.endsWith('rem')) return { value: parseFloat(s), unit: 2 };
-  if (s.endsWith('%')) return { value: parseFloat(s) / 100, unit: 1 };
-  return { value: parseFloat(s) || 0, unit: 0 };
+  if (s === 'full') return { value: 1, unit: 1 };
+  if (s.endsWith('rem')) return { value: Number.parseFloat(s), unit: 2 };
+  if (s.endsWith('%')) return { value: Number.parseFloat(s) / 100, unit: 1 };
+  return { value: Number.parseFloat(s) || 0, unit: 0 };
 }
 
 function toColor(value: any): { r: number; g: number; b: number; a: number } {
@@ -109,18 +110,18 @@ function toColor(value: any): { r: number; g: number; b: number; a: number } {
       const hex = value.slice(1);
       if (hex.length === 6) {
         return {
-          r: parseInt(hex.slice(0, 2), 16),
-          g: parseInt(hex.slice(2, 4), 16),
-          b: parseInt(hex.slice(4, 6), 16),
+          r: Number.parseInt(hex.slice(0, 2), 16),
+          g: Number.parseInt(hex.slice(2, 4), 16),
+          b: Number.parseInt(hex.slice(4, 6), 16),
           a: 255,
         };
       }
       if (hex.length === 8) {
         return {
-          r: parseInt(hex.slice(0, 2), 16),
-          g: parseInt(hex.slice(2, 4), 16),
-          b: parseInt(hex.slice(4, 6), 16),
-          a: parseInt(hex.slice(6, 8), 16),
+          r: Number.parseInt(hex.slice(0, 2), 16),
+          g: Number.parseInt(hex.slice(2, 4), 16),
+          b: Number.parseInt(hex.slice(4, 6), 16),
+          a: Number.parseInt(hex.slice(6, 8), 16),
         };
       }
     }
@@ -142,9 +143,10 @@ function toEnumValue(key: number, value: any): number {
   if (typeof value === 'number') return value;
   const s = String(value);
   switch (key) {
-    case PropKey.FlexDir:
+    case PropKey.FlexDir: {
       return FLEX_DIR_MAP[s] ?? 0;
-    case PropKey.Items:
+    }
+    case PropKey.Items: {
       return (
         (
           {
@@ -158,7 +160,8 @@ function toEnumValue(key: number, value: any): number {
           } as any
         )[s] ?? 3
       );
-    case PropKey.Justify:
+    }
+    case PropKey.Justify: {
       return (
         (
           {
@@ -176,10 +179,13 @@ function toEnumValue(key: number, value: any): number {
           } as any
         )[s] ?? 0
       );
-    case PropKey.Display:
+    }
+    case PropKey.Display: {
       return ({ none: 0, flex: 1, block: 2 } as any)[s] ?? 1;
-    default:
+    }
+    default: {
       return 0;
+    }
   }
 }
 
@@ -216,7 +222,7 @@ function setNativeProp(
     } else if (typeof value === 'number') {
       numValue = value;
     } else {
-      numValue = parseFloat(String(value)) || 0;
+      numValue = Number.parseFloat(String(value)) || 0;
     }
     core.setF32Prop(windowId, nodeId, key, numValue);
   }
@@ -242,12 +248,14 @@ function clearNativeProp(
 }
 
 function isEventProp(key: string): boolean {
+  const thirdCharacterCode = key.codePointAt(2);
   return (
     key.length >= 3 &&
     key[0] === 'o' &&
     key[1] === 'n' &&
-    key.charCodeAt(2) >= 65 &&
-    key.charCodeAt(2) <= 90
+    thirdCharacterCode !== undefined &&
+    thirdCharacterCode >= 65 &&
+    thirdCharacterCode <= 90
   );
 }
 
@@ -433,6 +441,7 @@ class ViewElement extends BaseElement<Record<string, any>> {
 }
 
 import type { InputHandle } from './useInput';
+
 import { __DEV__ } from '../constants';
 
 const INPUT_ATTR_NAMES = new Set([
@@ -592,28 +601,34 @@ class InputElement extends BaseElement<Record<string, any>> {
     value: any,
   ): void {
     switch (key) {
-      case 'value':
+      case 'value': {
         core.setInputValue(windowId, nodeId, String(value ?? ''));
         break;
-      case 'placeholder':
+      }
+      case 'placeholder': {
         core.setInputPlaceholder(windowId, nodeId, String(value ?? ''));
         break;
-      case 'disabled':
+      }
+      case 'disabled': {
         core.setInputDisabled(windowId, nodeId, !!value);
         break;
-      case 'maxLength':
+      }
+      case 'maxLength': {
         core.setInputMaxLength(
           windowId,
           nodeId,
           typeof value === 'number' ? value : -1,
         );
         break;
-      case 'multiline':
+      }
+      case 'multiline': {
         core.setInputMultiline(windowId, nodeId, !!value);
         break;
-      case 'secure':
+      }
+      case 'secure': {
         core.setInputSecure(windowId, nodeId, !!value);
         break;
+      }
     }
   }
 }
@@ -729,10 +744,6 @@ function getTextContent(children: any): string {
   return String(children);
 }
 
-function isInputType(type: string): boolean {
-  return type === 'input';
-}
-
 function isTextType(type: string): boolean {
   return type === 'text';
 }
@@ -778,8 +789,6 @@ type NoTimeout = undefined;
 type TransitionStatus = any;
 
 let currentPriority: EventPriority = DefaultEventPriority;
-let currentContainer: Container | null = null;
-
 const reconciler = ReactReconciler<
   Type,
   Props,
@@ -836,10 +845,10 @@ const reconciler = ReactReconciler<
 
   insertBefore(parent, child, before) {
     const idx = parent.children.indexOf(before);
-    if (idx >= 0) {
-      parent.children.splice(idx, 0, child);
-    } else {
+    if (idx === -1) {
       parent.children.push(child);
+    } else {
+      parent.children.splice(idx, 0, child);
     }
     child.parent = parent;
     core.insertBefore(parent.windowId, parent.id, child.id, before.id);
@@ -853,7 +862,7 @@ const reconciler = ReactReconciler<
 
   removeChild(parent, child) {
     const idx = parent.children.indexOf(child);
-    if (idx >= 0) parent.children.splice(idx, 1);
+    if (idx !== -1) parent.children.splice(idx, 1);
     child.parent = null;
     core.removeChild(parent.windowId, parent.id, child.id);
     child.destroy();
@@ -866,11 +875,11 @@ const reconciler = ReactReconciler<
     child.destroy();
   },
 
-  commitUpdate(instance, type, oldProps, newProps, _internalHandle) {
+  commitUpdate(instance, _type, oldProps, newProps, _internalHandle) {
     instance.commitUpdate(newProps, oldProps);
   },
 
-  commitTextUpdate(instance, oldText, newText) {
+  commitTextUpdate(instance, _oldText, newText) {
     instance.setText(newText);
   },
 
@@ -898,7 +907,7 @@ const reconciler = ReactReconciler<
     core.setText(instance.windowId, instance.id, '');
   },
 
-  clearContainer(container) {
+  clearContainer(_container) {
     console.log('[reconciler]: clear container');
   },
 
@@ -906,14 +915,12 @@ const reconciler = ReactReconciler<
   getChildHostContext: (parentHostContext) => parentHostContext,
   getPublicInstance: (instance) => instance,
 
-  prepareForCommit(container) {
-    currentContainer = container;
+  prepareForCommit(_container) {
     return null;
   },
 
   resetAfterCommit(container) {
     core.requestRedraw(container.window.id);
-    currentContainer = null;
   },
 
   preparePortalMount: () => {},

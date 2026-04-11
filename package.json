@@ -8,11 +8,14 @@
     "build:core": "cargo build --release -p uzumaki",
     "copy:artifacts": "bun scripts/copy-artifacts.ts",
     "format": "prettier --write .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "prepare": "husky"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,mjs}": [
-      "prettier --ignore-unknown --write"
+      "prettier --ignore-unknown --write",
+      "eslint --fix"
     ],
     "*.{json,md,yml,yaml}": [
       "prettier --write"
@@ -22,10 +25,20 @@
     ]
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bun": "latest",
+    "eslint": "^10.2.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-perfectionist": "^5.8.0",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-unicorn": "^64.0.0",
+    "globals": "^17.4.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.1"
   },
   "peerDependencies": {
     "typescript": "^5"

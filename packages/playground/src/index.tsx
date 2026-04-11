@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { Window } from 'uzumaki-ui';
 import { render } from 'uzumaki-ui/react';
+
 import { App as DashboardApp } from './app';
-import { App as CounterApp } from './counter';
-import { useState } from 'react';
-import { ACCENT_ORANGE, BASE_BG, BORDER, PANEL, SUBTEXT } from './styles';
 import { Button } from './button';
+import { App as CounterApp } from './counter';
+import { ACCENT_ORANGE, BASE_BG, BORDER, PANEL, SUBTEXT } from './styles';
 
 const window = new Window('main', {
   width: 1200,

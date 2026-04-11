@@ -1,5 +1,6 @@
-import core from './core';
 import type { NodeId } from './types';
+
+import core from './core';
 
 export const enum EventType {
   MouseMove = 0,
@@ -188,7 +189,7 @@ export class EventManager {
     const idx = entries.findIndex(
       (e) => e.handler === handler && e.capture === capture,
     );
-    if (idx >= 0) entries.splice(idx, 1);
+    if (idx !== -1) entries.splice(idx, 1);
     if (entries.length === 0) typeMap.delete(eventType);
     if (typeMap.size === 0) this.handlers.delete(key);
   }
@@ -265,7 +266,7 @@ export class EventManager {
     const idx = entries.findIndex(
       (e) => e.handler === handler && e.capture === capture,
     );
-    if (idx >= 0) entries.splice(idx, 1);
+    if (idx !== -1) entries.splice(idx, 1);
     if (entries.length === 0) typeMap.delete(eventType);
     if (typeMap.size === 0) this.windowHandlers.delete(windowId);
   }
@@ -414,12 +415,10 @@ export class EventManager {
     (base as any)._stoppedImmediate = false;
 
     // Wrap stopPropagation to also set internal flags
-    const origStop = base.stopPropagation;
     base.stopPropagation = function () {
       _stopped = true;
       (base as any)._stopped = true;
     };
-    const origStopImmediate = base.stopImmediatePropagation;
     base.stopImmediatePropagation = function () {
       _stopped = true;
       _stoppedImmediate = true;
@@ -528,7 +527,7 @@ export class EventManager {
     return _prevented;
   }
 
-  dispatchWindowEvent(windowId: number, type: EventType, payload: any): void {
+  dispatchWindowEvent(windowId: number, type: EventType): void {
     let _prevented = false;
     const event: UzumakiEvent = {
       type,

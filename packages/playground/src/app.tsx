@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useInput } from 'uzumaki-ui/react';
+
 import {
   NAV_ACTIVE,
   NAV_ITEM,
@@ -14,7 +15,6 @@ import {
   PANEL,
   SUBTEXT,
 } from './styles';
-import { Window } from 'uzumaki-ui';
 
 function NavItem({
   label,
@@ -84,16 +84,21 @@ function App() {
 
   function routeRenderer() {
     switch (activeTab) {
-      case 'dashboard':
+      case 'dashboard': {
         return <Dashboard />;
-      case 'analytics':
+      }
+      case 'analytics': {
         return <Analytics />;
-      case 'projects':
+      }
+      case 'projects': {
         return <Projects />;
-      case 'settings':
+      }
+      case 'settings': {
         return <Settings />;
-      default:
+      }
+      default: {
         return null;
+      }
     }
   }
 

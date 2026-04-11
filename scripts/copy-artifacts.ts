@@ -74,7 +74,7 @@ const supportedTargets: SupportedTarget[] = [
 function parseArgValue(flag: string) {
   const argv = process.argv.slice(2);
   const index = argv.indexOf(flag);
-  if (index === -1) return undefined;
+  if (index === -1) return;
   return argv[index + 1];
 }
 

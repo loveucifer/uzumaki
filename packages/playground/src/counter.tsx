@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
-import { ACCENT_BLUE, BASE_BG } from './styles';
 import { Button } from './button';
+import { ACCENT_BLUE, BASE_BG } from './styles';
 
 export function App() {
   const [count, setCount] = useState(0);
@@ -19,7 +19,7 @@ export function App() {
       <text fontSize={24}>Uzumaki X React</text>
 
       <Button
-        onClick={(ev) => {
+        onClick={() => {
           // console.log('counter click');
           setCount((c) => c + 1);
         }}
