@@ -79,24 +79,12 @@ jobs:
           retention-days: 1
 
   release:
-    name: Create GitHub Release & publish to npm
+    name: Create GitHub Release
     needs: [build]
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: latest
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          registry-url: https://registry.npmjs.org
-
-      - run: pnpm install --frozen-lockfile
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -113,8 +101,3 @@ jobs:
             artifacts/windows-x64/uzumaki-windows-x64.zip \
             artifacts/macos-x64/uzumaki-macos-x64.zip \
             artifacts/macos-arm64/uzumaki-macos-arm64.zip
-
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: pnpm -r publish --access public --no-git-checks
