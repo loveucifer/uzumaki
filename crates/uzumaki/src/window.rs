@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use std::sync::Arc;
 use vello::peniko::Color;
-use vello::{RenderParams, RendererOptions, Scene};
+use vello::{AaSupport, RenderParams, RendererOptions, Scene};
 
 use winit::window::Window as WinitWindow;
 
@@ -57,8 +57,16 @@ impl Window {
 
         surface.configure(&gpu.device, &surface_config);
 
-        let renderer = vello::Renderer::new(&gpu.device, RendererOptions::default())
-            .context("Error creating renderer")?;
+        // let renderer = vello::Renderer::new(&gpu.device, RendererOptions::default())
+        //     .context("Error creating renderer")?;
+        let renderer = vello::Renderer::new(
+            &gpu.device,
+            RendererOptions {
+                antialiasing_support: AaSupport::area_only(),
+                ..Default::default()
+            },
+        )
+        .context("Error creating renderer")?;
 
         let scene = Scene::new();
 
@@ -112,7 +120,7 @@ impl Window {
             base_color: Color::from_rgba8(24, 24, 37, 255),
             width,
             height,
-            antialiasing_method: vello::AaConfig::Msaa16,
+            antialiasing_method: vello::AaConfig::Area,
         };
         self.renderer
             .render_to_texture(device, queue, &self.scene, target_view, &render_params)
