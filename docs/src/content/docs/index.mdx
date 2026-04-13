@@ -1,0 +1,144 @@
+---
+title: Uzumaki
+description: Native desktop UI framework for JavaScript and TypeScript.
+template: splash
+hero:
+  tagline: Native desktop apps with React. GPU-rendered. No browser.
+  actions:
+    - text: Get Started
+      link: /guides/installation/
+      icon: right-arrow
+    - text: GitHub
+      link: https://github.com/golok727/uzumaki
+      icon: external
+      variant: minimal
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+### Install
+
+<Tabs syncKey="platform">
+  <TabItem label="Windows">
+    ```powershell
+    irm https://uzumaki.run/install.ps1 | iex
+    ```
+  </TabItem>
+  <TabItem label="macOS">
+    ```sh
+    curl -fsSL https://uzumaki.run/install.sh | sh
+    ```
+  </TabItem>
+  <TabItem label="Linux">
+    Coming soon.
+  </TabItem>
+</Tabs>
+
+<script>
+{`
+(function() {
+  function selectPlatformTab() {
+    const ua = navigator.userAgent || navigator.platform || '';
+    let label = 'Windows';
+    if (/Mac|iPhone|iPad/.test(ua)) label = 'macOS';
+    else if (/Linux/.test(ua)) label = 'Linux';
+
+    document.querySelectorAll('starlight-tabs').forEach(function(tabGroup) {
+      const tabs = tabGroup.querySelectorAll('[role="tab"]');
+      tabs.forEach(function(tab) {
+        if (tab.textContent.trim() === label) {
+          tab.click();
+        }
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(selectPlatformTab, 50);
+    });
+  } else {
+    setTimeout(selectPlatformTab, 50);
+  }
+})();
+`}
+</script>
+
+---
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-top: 1rem; margin-bottom: 2rem;">
+
+<div style="border: 1px solid #27272a; border-radius: 8px; padding: 1.25rem;">
+  <h3 style="margin-top: 0; color: #e2a52e;">GPU Rendered</h3>
+  <p style="color: #a1a1aa; margin-bottom: 0;">Built on wgpu and Vello. Hardware-accelerated 2D vector graphics. No Electron, no browser.</p>
+</div>
+
+<div style="border: 1px solid #27272a; border-radius: 8px; padding: 1.25rem;">
+  <h3 style="margin-top: 0; color: #e2a52e;">React + JSX</h3>
+  <p style="color: #a1a1aa; margin-bottom: 0;">Write native desktop apps with the React you already know. Hooks, state, components — it all works.</p>
+</div>
+
+<div style="border: 1px solid #27272a; border-radius: 8px; padding: 1.25rem;">
+  <h3 style="margin-top: 0; color: #e2a52e;">Deno Runtime</h3>
+  <p style="color: #a1a1aa; margin-bottom: 0;">TypeScript and JSX out of the box. No config needed. Just write your code and run it.</p>
+</div>
+
+</div>
+
+<Aside type="caution">
+  Uzumaki is in alpha. The API is unstable and will change. Do not use in production.
+</Aside>
+
+---
+
+```tsx
+// app.tsx
+import { useState } from 'react';
+import { Window } from 'uzumaki-ui';
+import { render } from 'uzumaki-ui/react';
+
+const window = new Window('main', {
+  width: 800,
+  height: 600,
+  title: 'My App',
+});
+
+function App() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <view
+      display="flex"
+      flexDir="col"
+      w="full"
+      h="full"
+      items="center"
+      justify="center"
+      bg="#0f0f0f"
+      gap={16}
+    >
+      <text fontSize={32} fontWeight={700} color="#e4e4e7">
+        Welcome to Uzumaki
+      </text>
+      <text fontSize={18} color="#a1a1aa">
+        Count: {count}
+      </text>
+      <view
+        onClick={() => setCount((c) => c + 1)}
+        p={10}
+        px={24}
+        bg="#2d2d30"
+        rounded={8}
+        hover:bg="#3e3e42"
+        cursor="pointer"
+      >
+        <text fontSize={16} color="#60a5fa">
+          Increment
+        </text>
+      </view>
+    </view>
+  );
+}
+
+render(window, <App />);
+```
