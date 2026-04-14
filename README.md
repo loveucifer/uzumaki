@@ -85,6 +85,8 @@ bun dev
 
 - [Docs](https://uzumaki.run)
 - [GitHub](https://github.com/golok727/uzumaki)
+- [Contributing](CONTRIBUTING.md)
+- [Development](DEVELOPMENT.md)
 - [X / Twitter](https://x.com/golok727)
 
 ## License
