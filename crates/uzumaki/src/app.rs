@@ -23,16 +23,16 @@ use winit::{application::ApplicationHandler, event::WindowEvent};
 
 use crate::clipboard;
 use crate::cursor;
-use crate::element::ElementTree;
 use crate::event_dispatch;
 use crate::gpu::GpuContext;
 use crate::runtime::module_loader::{UzCjsCodeAnalyzer, UzRequireLoader};
 use crate::runtime::resolver::UzCjsTracker;
 use crate::runtime::sys::UzSys;
+use crate::ui::UIState;
 use crate::{runtime, window};
 
 pub struct WindowEntry {
-    pub dom: ElementTree,
+    pub dom: UIState,
     pub handle: Option<window::Window>,
     pub rem_base: f32,
 }
@@ -733,7 +733,7 @@ impl ApplicationHandler<UserEvent> for Application {
                 if let Some(entry) = state.windows.get_mut(&wid) {
                     entry.dom.hit_state = Default::default();
                     if let Some(handle) = entry.handle.as_mut() {
-                        handle.set_cursor(cursor::CursorIcon::Default);
+                        handle.set_cursor(cursor::UzCursorIcon::Default);
                     }
                     needs_redraw = true;
                 }

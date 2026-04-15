@@ -1,4 +1,4 @@
-use crate::element::NodeId;
+use crate::element::UzNodeId;
 
 #[derive(Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct SelectionRange {
@@ -34,12 +34,12 @@ impl SelectionRange {
 #[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DomSelection {
     /// The textSelect root that owns this selection.
-    pub root: NodeId,
+    pub root: UzNodeId,
     pub range: SelectionRange,
 }
 
 impl DomSelection {
-    pub fn new(root: NodeId, anchor: usize, active: usize) -> Self {
+    pub fn new(root: UzNodeId, anchor: usize, active: usize) -> Self {
         Self {
             root,
             range: SelectionRange { anchor, active },

@@ -1,7 +1,7 @@
 use deno_core::*;
 
 use crate::app::{SharedAppState, with_state};
-use crate::element::NodeId;
+use crate::element::UzNodeId;
 use crate::selection::{DomSelection, SelectionRange};
 use crate::style::*;
 
@@ -24,9 +24,9 @@ pub fn op_create_element(
     with_state(&app_state, |s| {
         let entry = s.windows.get_mut(&window_id).expect("window not found");
         let id = if element_type == "input" {
-            entry.dom.create_input(Style::default())
+            entry.dom.create_input(UzStyle::default())
         } else {
-            entry.dom.create_view(Style::default())
+            entry.dom.create_view(UzStyle::default())
         };
         id as u32
     })
@@ -41,7 +41,7 @@ pub fn op_create_text_node(
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get_mut(&window_id).expect("window not found");
-        entry.dom.create_text(text, Style::default()) as u32
+        entry.dom.create_text(text, UzStyle::default()) as u32
     })
 }
 
@@ -52,8 +52,8 @@ pub fn op_append_child(
     #[smi] parent_id: u32,
     #[smi] child_id: u32,
 ) {
-    let pid = parent_id as NodeId;
-    let cid = child_id as NodeId;
+    let pid = parent_id as UzNodeId;
+    let cid = child_id as UzNodeId;
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get_mut(&window_id).expect("window not found");
@@ -69,9 +69,9 @@ pub fn op_insert_before(
     #[smi] child_id: u32,
     #[smi] before_id: u32,
 ) {
-    let pid = parent_id as NodeId;
-    let cid = child_id as NodeId;
-    let bid = before_id as NodeId;
+    let pid = parent_id as UzNodeId;
+    let cid = child_id as UzNodeId;
+    let bid = before_id as UzNodeId;
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get_mut(&window_id).expect("window not found");
@@ -86,8 +86,8 @@ pub fn op_remove_child(
     #[smi] parent_id: u32,
     #[smi] child_id: u32,
 ) {
-    let pid = parent_id as NodeId;
-    let cid = child_id as NodeId;
+    let pid = parent_id as UzNodeId;
+    let cid = child_id as UzNodeId;
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get_mut(&window_id).expect("window not found");
@@ -102,7 +102,7 @@ pub fn op_set_text(
     #[smi] node_id: u32,
     #[string] text: String,
 ) {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get_mut(&window_id).expect("window not found");
@@ -130,7 +130,7 @@ pub fn op_set_input_value(
     #[smi] node_id: u32,
     #[string] value: String,
 ) {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get_mut(&window_id).expect("window not found");
@@ -149,7 +149,7 @@ pub fn op_get_input_value(
     #[smi] window_id: u32,
     #[smi] node_id: u32,
 ) -> String {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get(&window_id).expect("window not found");
@@ -170,7 +170,7 @@ pub fn op_set_input_placeholder(
     #[smi] node_id: u32,
     #[string] placeholder: String,
 ) {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get_mut(&window_id).expect("window not found");
@@ -189,7 +189,7 @@ pub fn op_set_input_disabled(
     #[smi] node_id: u32,
     disabled: bool,
 ) {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get_mut(&window_id).expect("window not found");
@@ -208,7 +208,7 @@ pub fn op_set_input_max_length(
     #[smi] node_id: u32,
     #[smi] max_length: i32,
 ) {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get_mut(&window_id).expect("window not found");
@@ -231,7 +231,7 @@ pub fn op_set_input_multiline(
     #[smi] node_id: u32,
     multiline: bool,
 ) {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get_mut(&window_id).expect("window not found");
@@ -250,7 +250,7 @@ pub fn op_set_input_secure(
     #[smi] node_id: u32,
     secure: bool,
 ) {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get_mut(&window_id).expect("window not found");
@@ -264,7 +264,7 @@ pub fn op_set_input_secure(
 
 #[op2(fast)]
 pub fn op_focus_input(state: &mut OpState, #[smi] window_id: u32, #[smi] node_id: u32) {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get_mut(&window_id).expect("window not found");
@@ -282,7 +282,7 @@ pub fn op_get_ancestor_path(
     #[smi] window_id: u32,
     #[smi] node_id: u32,
 ) -> Vec<u32> {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
         let entry = s.windows.get(&window_id).expect("window not found");

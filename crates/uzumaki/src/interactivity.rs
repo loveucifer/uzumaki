@@ -1,7 +1,7 @@
 use refineable::Refineable;
 
-use crate::element::NodeId;
-use crate::style::{Bounds, Style, StyleRefinement};
+use crate::element::UzNodeId;
+use crate::style::{Bounds, UzStyle, UzStyleRefinement};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct HitboxId(pub u64);
@@ -9,7 +9,7 @@ pub struct HitboxId(pub u64);
 #[derive(Clone, Debug)]
 pub struct Hitbox {
     pub id: HitboxId,
-    pub node_id: NodeId,
+    pub node_id: UzNodeId,
     pub bounds: Bounds,
 }
 
@@ -26,19 +26,19 @@ pub struct HitTestState {
     /// Mouse position in window coordinates.
     pub mouse_position: Option<(f64, f64)>,
     /// Set of node IDs that the mouse is currently over (back-to-front order).
-    pub hovered_nodes: Vec<NodeId>,
+    pub hovered_nodes: Vec<UzNodeId>,
     /// The topmost (frontmost) hovered node, if any.
-    pub top_node: Option<NodeId>,
+    pub top_node: Option<UzNodeId>,
     /// Which node is currently pressed (mouse down without mouse up).
-    pub active_node: Option<NodeId>,
+    pub active_node: Option<UzNodeId>,
 }
 
 impl HitTestState {
-    pub fn is_hovered(&self, node_id: NodeId) -> bool {
+    pub fn is_hovered(&self, node_id: UzNodeId) -> bool {
         self.hovered_nodes.contains(&node_id)
     }
 
-    pub fn is_active(&self, node_id: NodeId) -> bool {
+    pub fn is_active(&self, node_id: UzNodeId) -> bool {
         self.active_node == Some(node_id) && self.is_hovered(node_id)
     }
 }
@@ -58,12 +58,12 @@ impl HitboxStore {
 
     /// Drop any hitbox whose `node_id` no longer passes `keep`.
     /// Used by Dom::on_node_removed to scrub stale references after a node is freed.
-    pub fn retain_by_node(&mut self, mut keep: impl FnMut(NodeId) -> bool) {
+    pub fn retain_by_node(&mut self, mut keep: impl FnMut(UzNodeId) -> bool) {
         self.hitboxes.retain(|h| keep(h.node_id));
     }
 
     /// Register a hitbox and return its ID.
-    pub fn insert(&mut self, node_id: NodeId, bounds: Bounds) -> HitboxId {
+    pub fn insert(&mut self, node_id: UzNodeId, bounds: Bounds) -> HitboxId {
         let id = HitboxId(self.next_id);
         self.next_id += 1;
         self.hitboxes.push(Hitbox {
@@ -133,11 +133,11 @@ pub type MouseEventListener = Box<dyn Fn(&MouseEvent, &Bounds) + Send + Sync>;
 #[derive(Default)]
 pub struct Interactivity {
     /// Base style refinement (always applied).
-    pub base_style: StyleRefinement,
+    pub base_style: UzStyleRefinement,
     /// Applied when the element's hitbox is hovered.
-    pub hover_style: Option<Box<StyleRefinement>>,
+    pub hover_style: Option<Box<UzStyleRefinement>>,
     /// Applied when the element's hitbox is active (mouse pressed on it).
-    pub active_style: Option<Box<StyleRefinement>>,
+    pub active_style: Option<Box<UzStyleRefinement>>,
 
     /// The hitbox ID assigned to this element during paint. None if not interactive.
     pub hitbox_id: Option<HitboxId>,
@@ -169,7 +169,12 @@ impl Interactivity {
 
     /// Compute the final Style for this element by starting with the base style
     /// and refining with hover/active styles based on the current hit test state.
-    pub fn compute_style(&self, base: &Style, node_id: NodeId, hit_state: &HitTestState) -> Style {
+    pub fn compute_style(
+        &self,
+        base: &UzStyle,
+        node_id: UzNodeId,
+        hit_state: &HitTestState,
+    ) -> UzStyle {
         let mut style = base.clone();
 
         // Apply base style refinement
@@ -193,12 +198,12 @@ impl Interactivity {
     }
 
     /// Set the hover style refinement.
-    pub fn on_hover(&mut self, style: StyleRefinement) {
+    pub fn on_hover(&mut self, style: UzStyleRefinement) {
         self.hover_style = Some(Box::new(style));
     }
 
     /// Set the active (pressed) style refinement.
-    pub fn on_active(&mut self, style: StyleRefinement) {
+    pub fn on_active(&mut self, style: UzStyleRefinement) {
         self.active_style = Some(Box::new(style));
     }
 

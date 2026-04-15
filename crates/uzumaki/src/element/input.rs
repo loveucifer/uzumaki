@@ -2,7 +2,7 @@ use vello::Scene;
 use vello::kurbo::{Affine, Rect};
 use vello::peniko::{Color as VelloColor, Fill};
 
-use crate::style::{Bounds, Color, Corners, Edges, Style};
+use crate::style::{Bounds, Color, Corners, Edges, UzStyle};
 use crate::text::{GlyphPos2D, TextRenderer};
 
 /// Returned by `paint_input` for multiline inputs so the caller can render a scrollbar.
@@ -35,7 +35,7 @@ pub fn paint_input(
     scene: &mut Scene,
     text_renderer: &mut TextRenderer,
     bounds: Bounds,
-    style: &Style,
+    style: &UzStyle,
     input: &InputRenderInfo,
     scale: f64,
 ) -> Option<InputContentInfo> {
@@ -211,7 +211,7 @@ fn paint_multiline(
     text_h: f64,
     line_height: f32,
     is_empty: bool,
-    style: &Style,
+    style: &UzStyle,
     scale: f64,
 ) -> InputContentInfo {
     let top_pad: f64 = if style.padding.top > 0.0 {

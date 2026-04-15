@@ -15,6 +15,7 @@ pub mod style;
 pub mod text;
 pub mod text_buffer;
 pub mod text_model;
+pub mod ui;
 pub mod window;
 
 use deno_core::*;

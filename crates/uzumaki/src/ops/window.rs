@@ -2,8 +2,8 @@ use deno_core::*;
 use winit::event_loop::EventLoopProxy;
 
 use crate::app::{SharedAppState, UserEvent, WindowEntry, WindowEntryId, with_state};
-use crate::element::ElementTree;
 use crate::style::*;
+use crate::ui::UIState;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct CreateWindowOptions {
@@ -23,8 +23,8 @@ pub fn op_create_window(
 
     let app_state = state.borrow::<SharedAppState>().clone();
     with_state(&app_state, |s| {
-        let mut dom = ElementTree::new();
-        let root = dom.create_view(Style {
+        let mut dom = UIState::new();
+        let root = dom.create_view(UzStyle {
             display: Display::Flex,
             size: Size {
                 width: Length::Percent(1.0),

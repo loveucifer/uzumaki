@@ -3,7 +3,7 @@ use vello::Scene;
 use vello::kurbo::{Affine, Rect, RoundedRect, RoundedRectRadii, Stroke};
 use vello::peniko::Color as VelloColor;
 
-use crate::cursor::CursorIcon;
+use crate::cursor::UzCursorIcon;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Color {
@@ -289,6 +289,30 @@ pub struct TextStyle {
     pub line_height: f32,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TextSelectable {
+    #[default]
+    Inherit,
+    True,
+    False,
+}
+
+impl From<bool> for TextSelectable {
+    fn from(value: bool) -> Self {
+        value.then_some(Self::True).unwrap_or(Self::False)
+    }
+}
+
+impl TextSelectable {
+    pub fn as_value(&self) -> Option<bool> {
+        (!matches!(self, Self::Inherit)).then_some(self == &Self::True)
+    }
+
+    pub fn selectable(&self) -> bool {
+        self == &Self::True
+    }
+}
+
 impl Default for TextStyle {
     fn default() -> Self {
         Self {
@@ -301,7 +325,7 @@ impl Default for TextStyle {
 
 #[derive(Clone, Debug, PartialEq, Refineable)]
 #[refineable(Debug)]
-pub struct Style {
+pub struct UzStyle {
     // Visibility
     pub display: Display,
     pub visibility: Visibility,
@@ -348,14 +372,19 @@ pub struct Style {
     pub opacity: f32,
     pub box_shadow: Option<BoxShadow>,
 
-    pub cursor: Option<CursorIcon>,
+    pub cursor: Option<UzCursorIcon>,
 
     // Text (inherited)
     #[refineable]
     pub text: TextStyle,
+
+    /// Whether text within this element is selectable.
+    /// None = inherit from parent (default). Some(true) = selectable, Some(false) = not.
+    /// toro move to style
+    pub text_selectable: TextSelectable,
 }
 
-impl Default for Style {
+impl Default for UzStyle {
     fn default() -> Self {
         Self {
             display: Display::default(),
@@ -393,11 +422,12 @@ impl Default for Style {
             cursor: None,
 
             text: TextStyle::default(),
+            text_selectable: TextSelectable::Inherit,
         }
     }
 }
 
-impl Style {
+impl UzStyle {
     pub fn to_taffy(&self) -> taffy::Style {
         taffy::Style {
             display: match self.display {

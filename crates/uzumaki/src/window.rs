@@ -5,11 +5,11 @@ use vello::{AaSupport, RenderParams, RendererOptions, Scene};
 
 use winit::window::Window as WinitWindow;
 
-use crate::cursor::CursorIcon;
-use crate::element::ElementTree;
+use crate::cursor::UzCursorIcon;
 use crate::element::render::Painter;
 use crate::gpu::GpuContext;
 use crate::text::TextRenderer;
+use crate::ui::UIState;
 
 pub struct Window {
     pub(crate) winit_window: Arc<WinitWindow>,
@@ -18,7 +18,7 @@ pub struct Window {
     pub(crate) renderer: vello::Renderer,
     pub(crate) scene: Scene,
     pub(crate) text_renderer: TextRenderer,
-    current_cursor: CursorIcon,
+    current_cursor: UzCursorIcon,
     valid_surface: bool,
     vello_target: Option<(wgpu::Texture, wgpu::TextureView)>,
 }
@@ -80,7 +80,7 @@ impl Window {
             surface_config,
             scene,
             text_renderer: TextRenderer::new(),
-            current_cursor: CursorIcon::Default,
+            current_cursor: UzCursorIcon::Default,
             valid_surface,
             vello_target: None,
         })
@@ -90,7 +90,7 @@ impl Window {
         self.winit_window.id()
     }
 
-    pub(crate) fn set_cursor(&mut self, icon: CursorIcon) {
+    pub(crate) fn set_cursor(&mut self, icon: UzCursorIcon) {
         if self.current_cursor == icon {
             return;
         }
@@ -102,7 +102,7 @@ impl Window {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        dom: &mut ElementTree,
+        dom: &mut UIState,
     ) {
         if !self.valid_surface {
             return;

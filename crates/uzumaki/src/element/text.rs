@@ -1,7 +1,7 @@
 use cosmic_text::Attrs;
 use vello::Scene;
 
-use crate::style::{Bounds, Color, Style};
+use crate::style::{Bounds, Color, UzStyle};
 use crate::text::TextRenderer;
 
 /// Paint a text element: background/borders from style, then text content.
@@ -10,7 +10,7 @@ pub fn paint_text(
     scene: &mut Scene,
     text_renderer: &mut TextRenderer,
     bounds: Bounds,
-    style: &Style,
+    style: &UzStyle,
     content: &str,
     font_size: f32,
     color: Color,

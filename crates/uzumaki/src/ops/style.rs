@@ -2,9 +2,10 @@ use deno_core::*;
 
 use crate::app::{SharedAppState, with_state};
 use crate::cursor;
-use crate::element::{self, ElementTree, Node, NodeId};
+use crate::element::{self, Node, UzNodeId};
 use crate::prop_keys::PropKey;
 use crate::style::*;
+use crate::ui::UIState;
 
 /// Outcome of applying a style prop to a node.
 enum StyleEffect {
@@ -25,7 +26,7 @@ pub fn op_set_length_prop(
     value: f64,
     #[smi] unit: u32,
 ) {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let Ok(prop) = PropKey::try_from(prop) else {
         return;
     };
@@ -60,7 +61,7 @@ pub fn op_set_color_prop(
     #[smi] b: u32,
     #[smi] a: u32,
 ) {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let Ok(prop) = PropKey::try_from(prop) else {
         return;
     };
@@ -90,7 +91,7 @@ pub fn op_set_f32_prop(
     #[smi] prop: u32,
     value: f64,
 ) {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let Ok(prop) = PropKey::try_from(prop) else {
         return;
     };
@@ -120,7 +121,7 @@ pub fn op_set_enum_prop(
     #[smi] prop: u32,
     #[smi] value: i32,
 ) {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let Ok(prop) = PropKey::try_from(prop) else {
         return;
     };
@@ -146,7 +147,7 @@ pub fn op_set_string_prop(
     #[smi] prop: u32,
     #[string] value: &str,
 ) {
-    let nid = node_id as NodeId;
+    let nid = node_id as UzNodeId;
     let Ok(prop) = PropKey::try_from(prop) else {
         return;
     };
@@ -162,7 +163,7 @@ pub fn op_set_string_prop(
         #[allow(clippy::single_match)]
         match prop {
             PropKey::Cursor => {
-                node.style.cursor = cursor::CursorIcon::parse(value);
+                node.style.cursor = cursor::UzCursorIcon::parse(value);
                 if let Some(handle) = entry.handle.as_mut()
                     && let Some(top) = entry.dom.hit_state.top_node
                 {
@@ -177,7 +178,7 @@ pub fn op_set_string_prop(
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-fn set_length_style_prop(style: &mut Style, prop: PropKey, length: Length) -> bool {
+fn set_length_style_prop(style: &mut UzStyle, prop: PropKey, length: Length) -> bool {
     match prop {
         PropKey::W => style.size.width = length,
         PropKey::H => style.size.height = length,
@@ -194,7 +195,7 @@ fn set_color_style_prop(node: &mut Node, prop: PropKey, color: Color) -> StyleEf
             let r = node
                 .interactivity
                 .hover_style
-                .get_or_insert_with(|| Box::new(StyleRefinement::default()));
+                .get_or_insert_with(|| Box::new(UzStyleRefinement::default()));
             match prop {
                 PropKey::HoverBg => r.background = Some(color),
                 PropKey::HoverColor => r.text.color = Some(color),
@@ -207,7 +208,7 @@ fn set_color_style_prop(node: &mut Node, prop: PropKey, color: Color) -> StyleEf
             let r = node
                 .interactivity
                 .active_style
-                .get_or_insert_with(|| Box::new(StyleRefinement::default()));
+                .get_or_insert_with(|| Box::new(UzStyleRefinement::default()));
             match prop {
                 PropKey::ActiveBg => r.background = Some(color),
                 PropKey::ActiveColor => r.text.color = Some(color),
@@ -239,7 +240,7 @@ fn set_f32_style_prop(node: &mut Node, prop: PropKey, v: f32) -> StyleEffect {
             let r = node
                 .interactivity
                 .hover_style
-                .get_or_insert_with(|| Box::new(StyleRefinement::default()));
+                .get_or_insert_with(|| Box::new(UzStyleRefinement::default()));
             r.opacity = Some(v);
             return StyleEffect::Applied;
         }
@@ -247,7 +248,7 @@ fn set_f32_style_prop(node: &mut Node, prop: PropKey, v: f32) -> StyleEffect {
             let r = node
                 .interactivity
                 .active_style
-                .get_or_insert_with(|| Box::new(StyleRefinement::default()));
+                .get_or_insert_with(|| Box::new(UzStyleRefinement::default()));
             r.opacity = Some(v);
             return StyleEffect::Applied;
         }
@@ -268,7 +269,7 @@ fn set_f32_style_prop(node: &mut Node, prop: PropKey, v: f32) -> StyleEffect {
             return StyleEffect::AppliedNeedsSync;
         }
         PropKey::TextSelect => {
-            node.selectable = Some(v > 0.5);
+            node.set_text_selectable((v > 0.5).into());
             return StyleEffect::Applied;
         }
         _ => {}
@@ -339,7 +340,7 @@ fn set_f32_style_prop(node: &mut Node, prop: PropKey, v: f32) -> StyleEffect {
     StyleEffect::AppliedNeedsSync
 }
 
-fn set_enum_style_prop(style: &mut Style, prop: PropKey, value: i32) -> bool {
+fn set_enum_style_prop(style: &mut UzStyle, prop: PropKey, value: i32) -> bool {
     match prop {
         PropKey::FlexDir => {
             style.flex_direction = match value {
@@ -384,7 +385,7 @@ fn set_enum_style_prop(style: &mut Style, prop: PropKey, value: i32) -> bool {
     true
 }
 
-fn sync_taffy(dom: &mut ElementTree, node_id: NodeId) {
+fn sync_taffy(dom: &mut UIState, node_id: UzNodeId) {
     let Some(node) = dom.nodes.get(node_id) else {
         return;
     };

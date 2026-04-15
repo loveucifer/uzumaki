@@ -5,8 +5,9 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::input::RangeProvider;
 use crate::selection::{DomSelection, SelectionRange};
+use crate::ui::UIState;
 
-use super::{ElementTree, NodeId, TextRunEntry, TextSelectRun};
+use super::{TextRunEntry, TextSelectRun, UzNodeId};
 
 #[derive(Debug, Clone)]
 pub struct SharedSelectionState {
@@ -65,22 +66,22 @@ impl RangeProvider for DomRangeProvider {
     }
 }
 
-impl ElementTree {
+impl UIState {
     /// Build text runs for all textSelect subtrees. Called each frame before render.
     pub fn build_text_select_runs(&mut self) {
         self.selectable_text_runs.clear();
         let Some(root) = self.root else { return };
 
         // DFS: (node_id, parent_resolved_text_select, current_run_index_or_none)
-        let mut stack: Vec<(NodeId, bool, Option<usize>)> = vec![(root, false, None)];
+        let mut stack: Vec<(UzNodeId, bool, Option<usize>)> = vec![(root, false, None)];
 
         while let Some((node_id, parent_ts, run_idx)) = stack.pop() {
             let node = &self.nodes[node_id];
-            let resolved_ts = node.selectable.unwrap_or(parent_ts);
+            let resolved_text_sel = node.text_selectable().as_value().unwrap_or(parent_ts);
 
             // A node that explicitly enables textSelect when the parent scope
             // doesn't have it starts a new selection scope.
-            let current_run = if resolved_ts && run_idx.is_none() {
+            let current_run = if resolved_text_sel && run_idx.is_none() {
                 let idx = self.selectable_text_runs.len();
                 self.selectable_text_runs.push(TextSelectRun {
                     root_id: node_id,
@@ -89,7 +90,7 @@ impl ElementTree {
                     total_graphemes: 0,
                 });
                 Some(idx)
-            } else if resolved_ts {
+            } else if resolved_text_sel {
                 run_idx
             } else {
                 None
@@ -118,7 +119,7 @@ impl ElementTree {
                 child = self.nodes[cid].next_sibling;
             }
             for &cid in children.iter().rev() {
-                stack.push((cid, resolved_ts, current_run));
+                stack.push((cid, resolved_text_sel, current_run));
             }
         }
     }
@@ -167,7 +168,7 @@ impl ElementTree {
 
     /// Get the full selection state: root node, anchor, and active offsets.
     /// Useful for text editors that need to know the direction of selection.
-    pub fn selection_state(&self) -> Option<(NodeId, usize, usize)> {
+    pub fn selection_state(&self) -> Option<(UzNodeId, usize, usize)> {
         let sel = self.selection.get()?;
         Some((sel.root, sel.anchor(), sel.active()))
     }

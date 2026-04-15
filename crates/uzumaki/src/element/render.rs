@@ -6,14 +6,14 @@ use vello::kurbo::{Affine, Rect, RoundedRect, RoundedRectRadii};
 use vello::peniko::{Color as VelloColor, Fill};
 
 use crate::element::input::{InputRenderInfo, compute_selection_rects};
-use crate::element::{ElementTree, InheritedProperties, NodeContext, NodeId, ScrollThumbRect};
-use crate::style::{Bounds, Color, Style};
+use crate::element::{InheritedProperties, NodeContext, ScrollThumbRect, UzNodeId};
+use crate::style::{Bounds, Color, UzStyle};
 use crate::text::TextRenderer;
-
+use crate::ui::UIState;
 /// Renders an `ElementTree` into a Vello `Scene`. Also rebuilds hitboxes and
 /// scroll thumbs as a side effect of walking the tree.
 pub struct Painter<'a> {
-    dom: &'a mut ElementTree,
+    dom: &'a mut UIState,
     scene: &'a mut Scene,
     text_renderer: &'a mut TextRenderer,
     scale: f64,
@@ -21,7 +21,7 @@ pub struct Painter<'a> {
 
 impl<'a> Painter<'a> {
     pub fn new(
-        dom: &'a mut ElementTree,
+        dom: &'a mut UIState,
         scene: &'a mut Scene,
         text_renderer: &'a mut TextRenderer,
         scale: f64,
@@ -44,7 +44,7 @@ impl<'a> Painter<'a> {
         }
     }
 
-    fn render_tree(&mut self, root_id: NodeId) {
+    fn render_tree(&mut self, root_id: UzNodeId) {
         let scale = self.scale;
 
         // Pre-compute per-node selection ranges for text selection painting
@@ -88,8 +88,10 @@ impl<'a> Painter<'a> {
 
                         // Resolve inherited properties
                         let mut inherited = parent_inherited.clone();
-                        if let Some(ts) = node.selectable {
-                            inherited.selectable = ts;
+
+                        // if not inherited property set the value
+                        if let Some(text_selectable) = node.text_selectable().as_value() {
+                            inherited.text_selectable = text_selectable;
                         }
 
                         let taffy_node = node.taffy_node;
@@ -126,7 +128,7 @@ impl<'a> Painter<'a> {
                         });
 
                         // Text nodes inside textSelect views need hitboxes for click-to-select
-                        let selectable_text = inherited.selectable && node.behavior.is_text();
+                        let selectable_text = inherited.text_selectable && node.behavior.is_text();
                         let needs_hitbox = node.interactivity.needs_hitbox() || selectable_text;
                         let is_scrollable = node.scroll_state.is_some();
                         let first_child = node.first_child;
@@ -276,7 +278,7 @@ impl<'a> Painter<'a> {
         }
     }
 
-    fn paint_node(&mut self, info: &RenderInfo, text_sel_map: &HashMap<NodeId, (usize, usize)>) {
+    fn paint_node(&mut self, info: &RenderInfo, text_sel_map: &HashMap<UzNodeId, (usize, usize)>) {
         let scale = self.scale;
         let bounds = Bounds::new(info.x, info.y, info.w, info.h);
 
@@ -493,7 +495,7 @@ impl<'a> Painter<'a> {
 
     /// Pre-compute per-text-node selection ranges for the current frame.
     /// Returns a map from NodeId → (local_sel_start, local_sel_end) in grapheme units.
-    fn compute_text_selections_map(&self) -> HashMap<NodeId, (usize, usize)> {
+    fn compute_text_selections_map(&self) -> HashMap<UzNodeId, (usize, usize)> {
         let mut map = HashMap::new();
         let Some(sel) = self.dom.selection.get() else {
             return map;
@@ -529,19 +531,19 @@ impl<'a> Painter<'a> {
 // ── Render-only intermediate types ──────────────────────────────────
 
 struct RenderInfo {
-    node_id: NodeId,
+    node_id: UzNodeId,
     x: f64,
     y: f64,
     w: f64,
     h: f64,
-    style: Box<Style>,
+    style: Box<UzStyle>,
     text: Option<(String, f32, Color)>,
     needs_hitbox: bool,
     input: Option<InputRenderInfo>,
 }
 
 struct ThumbInfo {
-    node_id: NodeId,
+    node_id: UzNodeId,
     view_x: f64,
     view_y: f64,
     view_w: f64,
@@ -562,7 +564,7 @@ enum RenderCommand {
 }
 
 enum StackItem {
-    Visit(NodeId, f64, f64, InheritedProperties),
+    Visit(UzNodeId, f64, f64, InheritedProperties),
     PushClip(Rect, f64),
     PopClip,
     PaintThumb(ThumbInfo),

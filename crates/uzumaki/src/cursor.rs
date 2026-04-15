@@ -2,7 +2,7 @@ use winit::window::CursorIcon as WinitCursorIcon;
 
 /// A subset of CSS cursor keywords that map cleanly to platform cursors.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
-pub enum CursorIcon {
+pub enum UzCursorIcon {
     #[default]
     Default,
     Pointer,
@@ -26,7 +26,7 @@ pub enum CursorIcon {
     ZoomOut,
 }
 
-impl CursorIcon {
+impl UzCursorIcon {
     pub fn parse(value: &str) -> Option<Self> {
         let icon = match value.trim() {
             "default" | "auto" | "initial" => Self::Default,
