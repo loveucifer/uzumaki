@@ -51,7 +51,7 @@ const PROP_KEYS: &[(&str, u32)] = &[
     ("Display", 39),
     ("Cursor", 40),
     ("Interactive", 41),
-    ("Visible", 42),
+    ("Visibility", 42),
     ("HoverBg", 43),
     ("HoverColor", 44),
     ("HoverOpacity", 45),

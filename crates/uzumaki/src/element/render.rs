@@ -7,7 +7,7 @@ use vello::peniko::{Color as VelloColor, Fill};
 
 use crate::element::input::{InputRenderInfo, compute_selection_rects};
 use crate::element::{ElementTree, InheritedProperties, NodeContext, NodeId, ScrollThumbRect};
-use crate::style::{Bounds, Color, Style};
+use crate::style::{Bounds, Color, Style, Visibility};
 use crate::text::TextRenderer;
 
 /// Renders an `ElementTree` into a Vello `Scene`. Also rebuilds hitboxes and
@@ -143,6 +143,10 @@ impl<'a> Painter<'a> {
                         )
                     };
                     // immutable borrow of self.dom.nodes is now dropped
+
+                    if computed_style.visibility == Visibility::Hidden {
+                        continue;
+                    }
 
                     let Ok(layout) = self.dom.taffy.layout(taffy_node) else {
                         continue;

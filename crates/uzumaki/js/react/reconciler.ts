@@ -63,6 +63,7 @@ const PROP_NAME_TO_KEY: Record<string, number> = {
   'active:borderColor': PropKey.ActiveBorderColor,
   scrollable: PropKey.Scrollable,
   selectable: PropKey.TextSelect,
+  visibility: PropKey.Visibility,
 };
 
 const INTRINSIC_ELEMENTS = new Set([
@@ -219,6 +220,12 @@ function setNativeProp(
     core.setEnumProp(windowId, nodeId, key, toEnumValue(key, value));
   } else if (STRING_KEYS.has(key)) {
     core.setStringProp(windowId, nodeId, key, String(value));
+  } else if (key === PropKey.Visibility) {
+    if (typeof value === 'string') {
+      core.setF32Prop(windowId, nodeId, key, value === 'visible' ? 1 : 0);
+    } else {
+      core.setF32Prop(windowId, nodeId, key, value ? 1 : 0);
+    }
   } else {
     let numValue: number;
     if (typeof value === 'boolean') {
@@ -876,19 +883,19 @@ const reconciler = ReactReconciler<
   },
 
   hideInstance(instance) {
-    core.setF32Prop(instance.windowId, instance.id, PropKey.Visible, 0);
+    core.setF32Prop(instance.windowId, instance.id, PropKey.Visibility, 0);
   },
 
   unhideInstance(instance) {
-    core.setF32Prop(instance.windowId, instance.id, PropKey.Visible, 1);
+    core.setF32Prop(instance.windowId, instance.id, PropKey.Visibility, 1);
   },
 
   hideTextInstance(instance) {
-    core.setF32Prop(instance.windowId, instance.id, PropKey.Visible, 0);
+    core.setF32Prop(instance.windowId, instance.id, PropKey.Visibility, 0);
   },
 
   unhideTextInstance(instance) {
-    core.setF32Prop(instance.windowId, instance.id, PropKey.Visible, 1);
+    core.setF32Prop(instance.windowId, instance.id, PropKey.Visibility, 1);
   },
 
   resetTextContent(instance) {

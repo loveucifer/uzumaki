@@ -75,6 +75,7 @@ interface ElementStyles {
   scrollable?: boolean;
   // if true text inside this view can be selected
   selectable?: boolean;
+  visibility?: 'visible' | 'hidden';
 }
 
 type PrefixedStyles<Prefix extends string> = {
