@@ -3,7 +3,7 @@ name = "refineable"
 edition.workspace = true
 version = "0.1.0"
 publish = false
-license = "Apache-2.0"
+license.workspace = true
 description = "A macro for creating 'refinement' types that can be used to partially initialize or mutate a complex struct"
 
 [lib]

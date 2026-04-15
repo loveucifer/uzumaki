@@ -89,4 +89,4 @@ bun dev
 
 ## License
 
-[MIT](LICENSE)
+Licensed under either MIT or Apache 2.0, at your option.
