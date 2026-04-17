@@ -23,12 +23,6 @@ The runtime embeds a Deno-based JavaScript engine and renders the UI with **wgpu
 
 Uzumaki requires a specific Rust version defined in `rust-toolchain.toml` (currently **1.92.0**). Install Rust via [rustup](https://rustup.rs/) — the correct toolchain will be selected automatically.
 
-```sh
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustc -V
-cargo -V
-```
-
 ### Bun (for bundling you can you anything)
 
 - **[Bun](https://bun.sh/)** >= 1.0
@@ -44,19 +38,16 @@ The runtime depends on `deno_runtime` and `deno_core`, so you need the native to
    - Visual C++ tools for CMake
    - Windows 10/11 SDK
    - C++/CLI support
-2. Install the [Protocol Buffers compiler](https://github.com/protocolbuffers/protobuf/releases/latest) and add `protoc` to your `PATH`.
-3. Install LLVM/Clang:
+2. Install LLVM/Clang:
    ```powershell
    winget install LLVM.LLVM
    ```
    Make sure `clang` is on your `PATH`.
-4. Enable **Developer Mode** in Windows Settings (required for symlink support).
 
 #### macOS
 
 ```sh
 xcode-select --install    # XCode Command Line Tools
-brew install cmake protobuf
 ```
 
 On Apple Silicon (M1/M2+), also install `llvm` and `lld`:
@@ -74,9 +65,6 @@ wget https://apt.llvm.org/llvm.sh
 chmod +x llvm.sh
 ./llvm.sh 17
 apt install --install-recommends -y cmake libglib2.0-dev
-
-# Protobuf
-apt install -y protobuf-compiler
 ```
 
 ## Building
@@ -98,24 +86,15 @@ cargo build --release -p uzumaki
 ### Run the playground
 
 ```sh
-pnpm start
+pnpm dev
 # or separately:
-pnpm build:core
 pnpm --filter playground dev
 ```
 
 ### Quick iteration
 
-If you're only changing TypeScript/JSX code in the playground:
-
 ```sh
 pnpm --filter playground dev
-```
-
-If you're changing Rust code, rebuild the core first:
-
-```sh
-cargo build --release -p uzumaki && pnpm --filter playground dev
 ```
 
 ### Compile checks (no binary output)
