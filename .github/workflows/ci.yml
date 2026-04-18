@@ -27,6 +27,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Linux system dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libfontconfig1-dev
+
       - uses: dsherret/rust-toolchain-file@v1
 
       - uses: actions/cache@v4
@@ -92,6 +95,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libfontconfig1-dev
 
       - uses: dsherret/rust-toolchain-file@v1
 
