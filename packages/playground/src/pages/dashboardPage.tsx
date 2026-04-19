@@ -1,0 +1,343 @@
+import { useState, useEffect } from 'react';
+import { C } from '../theme';
+import { Divider, Badge, ProgressBar, StatCard } from '../components';
+
+export function DashboardPage() {
+  const [tick, setTick] = useState(0);
+  const [cpu, setCpu] = useState(42);
+  const [mem, setMem] = useState(67);
+  const [net, setNet] = useState(31);
+  const [gpu, setGpu] = useState(78);
+  const [disk, setDisk] = useState(54);
+  const [blink, setBlink] = useState(true);
+  const [log, setLog] = useState<string[]>([
+    'Renderer initialized',
+    'wgpu device acquired',
+    'Vello scene created',
+    'React tree mounted',
+  ]);
+
+  const spinFrames = ['◐', '◓', '◑', '◒'];
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTick((t) => t + 1);
+      setCpu((v) => Math.max(4, Math.min(97, v + (Math.random() - 0.48) * 8)));
+      setMem((v) => Math.max(20, Math.min(93, v + (Math.random() - 0.5) * 3)));
+      setNet((v) => Math.max(0, Math.min(100, v + (Math.random() - 0.5) * 18)));
+      setGpu((v) => Math.max(30, Math.min(99, v + (Math.random() - 0.5) * 6)));
+      setDisk((v) => Math.max(10, Math.min(80, v + (Math.random() - 0.5) * 2)));
+      setBlink((b) => !b);
+      setLog((prev) => {
+        const events = [
+          'Render pass started',
+          'Layout computed',
+          'GPU flush',
+          'Event polled',
+          'State reconciled',
+          'Paint scheduled',
+          'Frame submitted',
+          'Texture uploaded',
+          'Shader compiled',
+          'Buffer mapped',
+          'Glyph rasterized',
+          'Path stroked',
+        ];
+        const ev = events[Math.floor(Math.random() * events.length)];
+        return [ev, ...prev.slice(0, 14)];
+      });
+    }, 500);
+    return () => clearInterval(id);
+  }, []);
+
+  const spinChar = spinFrames[tick % 4];
+  const fps = 60;
+
+  return (
+    <view display="flex" flexDir="col" gap={0} h="full" scrollable>
+      <view
+        display="flex"
+        flexDir="row"
+        items="center"
+        justify="between"
+        px={24}
+        py={16}
+        borderBottom={1}
+        borderColor={C.border}
+      >
+        <view display="flex" flexDir="col" gap={2}>
+          <text fontSize={20} fontWeight={800} color={C.text}>
+            System Dashboard
+          </text>
+          <view display="flex" flexDir="row" items="center" gap={8}>
+            <view px={8} py={2} bg={C.accentDim} rounded={4}>
+              <text fontSize={10} fontWeight={700} color={C.accentHi}>
+                DEMO MODE
+              </text>
+            </view>
+            <text fontSize={12} color={C.textMuted}>
+              Fake data for demonstration
+            </text>
+          </view>
+        </view>
+        <view display="flex" flexDir="row" items="center" gap={10}>
+          <view
+            display="flex"
+            flexDir="row"
+            items="center"
+            gap={6}
+            px={12}
+            py={6}
+            bg={C.successDim}
+            rounded={8}
+          >
+            <text fontSize={14} color={C.success} opacity={blink ? 1 : 0.3}>
+              {spinChar}
+            </text>
+            <text fontSize={12} fontWeight={600} color={C.successHi}>
+              LIVE
+            </text>
+          </view>
+          <view
+            px={12}
+            py={6}
+            bg={C.surface3}
+            rounded={8}
+            border={1}
+            borderColor={C.border}
+          >
+            <text fontSize={12} color={C.textMuted}>
+              tick #{tick} · frame ~{tick * fps}
+            </text>
+          </view>
+        </view>
+      </view>
+
+      <view display="flex" flexDir="col" gap={20} p={24}>
+        <view display="flex" flexDir="row" gap={12}>
+          <StatCard
+            label="Rendered Frames"
+            value={`${(tick * fps).toLocaleString()}`}
+            sub={`~${fps} fps target`}
+            color={C.accentHi}
+          />
+          <StatCard
+            label="React Nodes"
+            value={`${148 + (tick % 12)}`}
+            sub="in tree"
+            color={C.primaryHi}
+          />
+          <StatCard
+            label="Heap Used"
+            value={`${(mem * 0.72).toFixed(1)} MB`}
+            sub="managed runtime"
+            color={C.successHi}
+          />
+          <StatCard
+            label="Events Fired"
+            value={`${(tick * 6).toLocaleString()}`}
+            sub="total dispatched"
+            color={C.warningHi}
+          />
+        </view>
+
+        <view display="flex" flexDir="row" gap={12}>
+          <view
+            flex={3}
+            p={20}
+            bg={C.surface2}
+            rounded={8}
+            border={1}
+            borderColor={C.border}
+            display="flex"
+            flexDir="col"
+            gap={16}
+          >
+            <text fontSize={14} fontWeight={700} color={C.text}>
+              Resource Usage
+            </text>
+            <ProgressBar
+              label="CPU"
+              value={cpu}
+              color={cpu > 80 ? C.danger : (cpu > 60 ? C.warning : C.accentHi)}
+              trackColor={C.surface4}
+            />
+            <ProgressBar
+              label="Memory"
+              value={mem}
+              color={mem > 80 ? C.danger : C.primary}
+              trackColor={C.surface4}
+            />
+            <ProgressBar
+              label="Network I/O"
+              value={net}
+              color={C.success}
+              trackColor={C.surface4}
+            />
+            <ProgressBar
+              label="GPU"
+              value={gpu}
+              color={gpu > 85 ? C.warning : C.primary}
+              trackColor={C.surface4}
+            />
+            <ProgressBar
+              label="Disk"
+              value={disk}
+              color={C.textSub}
+              trackColor={C.surface4}
+            />
+          </view>
+
+          <view
+            flex={2}
+            p={20}
+            bg={C.surface2}
+            rounded={8}
+            border={1}
+            borderColor={C.border}
+            display="flex"
+            flexDir="col"
+            gap={12}
+          >
+            <text fontSize={14} fontWeight={700} color={C.text}>
+              CPU Bars (last 20 ticks)
+            </text>
+            <view display="flex" flexDir="row" flex={1} gap={1} h={80}>
+              {Array.from({ length: 20 }, (_, i) => {
+                const age = 19 - i;
+                const h = 20 + Math.abs(Math.sin((tick - age) * 0.7 + i) * 60);
+                const isHot = h > 65;
+                const barHeight = Math.round((h / 100) * 80);
+                return (
+                  <view
+                    key={i}
+                    display="flex"
+                    flexDir="col"
+                    justify="end"
+                    w="5%"
+                    h="full"
+                  >
+                    <view
+                      w="full"
+                      h={barHeight}
+                      bg={isHot ? C.danger : (age < 3 ? C.accentHi : C.accentDim)}
+                      rounded={4}
+                      opacity={1 - age * 0.03}
+                    />
+                  </view>
+                );
+              })}
+            </view>
+            <Divider />
+            <view display="flex" flexDir="col" gap={8}>
+              <view
+                display="flex"
+                flexDir="row"
+                items="center"
+                justify="between"
+              >
+                <text fontSize={12} color={C.textMuted}>
+                  Current
+                </text>
+                <text
+                  fontSize={13}
+                  fontWeight={700}
+                  color={cpu > 80 ? C.dangerHi : C.accentHi}
+                >
+                  {cpu.toFixed(1)}%
+                </text>
+              </view>
+              <view
+                display="flex"
+                flexDir="row"
+                items="center"
+                justify="between"
+              >
+                <text fontSize={12} color={C.textMuted}>
+                  Peak
+                </text>
+                <text fontSize={13} fontWeight={700} color={C.warning}>
+                  97.3%
+                </text>
+              </view>
+              <view
+                display="flex"
+                flexDir="row"
+                items="center"
+                justify="between"
+              >
+                <text fontSize={12} color={C.textMuted}>
+                  Avg
+                </text>
+                <text fontSize={13} fontWeight={700} color={C.textSub}>
+                  51.2%
+                </text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view
+          display="flex"
+          flexDir="col"
+          p={20}
+          bg={C.surface}
+          rounded={8}
+          border={1}
+          borderColor={C.border}
+        >
+          <view
+            display="flex"
+            flexDir="row"
+            items="center"
+            justify="between"
+            mb={12}
+          >
+            <text fontSize={14} fontWeight={700} color={C.text}>
+              Render Event Log
+            </text>
+            <Badge label="STREAMING" color={C.successHi} bg={C.successDim} />
+          </view>
+          <view
+            scrollable
+            h={160}
+            overflowX="hidden"
+            display="flex"
+            flexDir="col"
+          >
+            {log.map((ev, i) => (
+              <view
+                key={i}
+                w="full"
+                display="flex"
+                flexDir="row"
+                items="center"
+                gap={10}
+                py={6}
+                borderBottom={1}
+                borderColor={C.border}
+              >
+                <text fontSize={10} color={C.textMuted} fontWeight={700}>
+                  {String(log.length - i).padStart(3, '0')}
+                </text>
+                <view
+                  w={6}
+                  h={6}
+                  bg={i === 0 ? C.success : C.surface4}
+                  rounded={4}
+                />
+                <text
+                  fontSize={12}
+                  color={i === 0 ? C.successHi : C.textMuted}
+                  fontWeight={i === 0 ? 600 : 400}
+                >
+                  {ev}
+                </text>
+              </view>
+            ))}
+          </view>
+        </view>
+      </view>
+    </view>
+  );
+}
