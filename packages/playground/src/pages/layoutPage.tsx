@@ -343,212 +343,213 @@ export function LayoutPage() {
             </text>
           </view>
 
-          <view display="flex" flexDir="row" gap={12}>
-            <view
-              display="flex"
-              flexDir="col"
-              gap={8}
-              flex={1}
-              minW={200}
-              p={16}
-              bg={C.surface2}
-              rounded={12}
-              border={1}
-              borderColor={C.border}
-            >
-              <view display="flex" flexDir="col" gap={4}>
-                <text fontSize={13} fontWeight={600} color={C.accentHi}>
-                  Default
-                </text>
-                <text fontSize={12} color={C.textMuted}>
-                  No properties set
-                </text>
-              </view>
+          <view display="flex" flexDir="col" gap={12}>
+            <view display="flex" flexDir="row" gap={12}>
               <view
                 display="flex"
-                items="center"
-                justify="center"
+                flexDir="col"
+                gap={8}
+                flex={1}
                 p={12}
-                bg={C.surface}
-                rounded={8}
+                bg={C.surface2}
+                rounded={12}
+                border={1}
+                borderColor={C.border}
               >
-                <button
-                  w={120}
-                  bg={C.accent}
-                  cursor="pointer"
-                  hover:bg={C.accentDim}
-                >
-                  button text
-                </button>
-              </view>
-            </view>
-
-            <view
-              display="flex"
-              flexDir="col"
-              gap={8}
-              flex={1}
-              minW={200}
-              p={16}
-              bg={C.surface2}
-              rounded={12}
-              border={1}
-              borderColor={C.border}
-            >
-              <view display="flex" flexDir="col" gap={4}>
-                <text fontSize={13} fontWeight={600} color={C.accentHi}>
-                  With Padding
-                </text>
-                <text fontSize={12} color={C.textMuted}>
-                  px: 12 | py: 6
-                </text>
-              </view>
-              <view
-                display="flex"
-                items="center"
-                justify="center"
-                p={12}
-                bg={C.surface}
-                rounded={8}
-              >
-                <button
-                  w={120}
-                  px={12}
-                  py={6}
-                  bg={C.accent}
-                  cursor="pointer"
-                  hover:bg={C.accentDim}
-                >
-                  button text
-                </button>
-              </view>
-            </view>
-
-            <view
-              display="flex"
-              flexDir="col"
-              gap={8}
-              flex={1}
-              minW={200}
-              p={16}
-              bg={C.surface2}
-              rounded={12}
-              border={1}
-              borderColor={C.border}
-            >
-              <view display="flex" flexDir="col" gap={4}>
-                <text fontSize={13} fontWeight={600} color={C.accentHi}>
-                  Uniform Padding
-                </text>
-                <text fontSize={12} color={C.textMuted}>
-                  padding: 12
-                </text>
-              </view>
-              <view
-                display="flex"
-                items="center"
-                justify="center"
-                p={12}
-                bg={C.surface}
-                rounded={8}
-              >
-                <button
-                  w={120}
-                  p={12}
-                  bg={C.accent}
-                  cursor="pointer"
-                  hover:bg={C.accentDim}
-                >
-                  button text
-                </button>
-              </view>
-            </view>
-
-            <view
-              display="flex"
-              flexDir="col"
-              gap={8}
-              flex={1}
-              minW={200}
-              p={16}
-              bg={C.surface2}
-              rounded={12}
-              border={1}
-              borderColor={C.border}
-            >
-              <view display="flex" flexDir="col" gap={4}>
-                <text fontSize={13} fontWeight={600} color={C.accentHi}>
-                  Rounded
-                </text>
-                <text fontSize={12} color={C.textMuted}>
-                  rounded: 8 | px: 12 | py: 6
-                </text>
-              </view>
-              <view
-                display="flex"
-                items="center"
-                justify="center"
-                p={12}
-                bg={C.surface}
-                rounded={8}
-              >
-                <button
-                  w={120}
-                  rounded={8}
-                  px={12}
-                  py={6}
-                  bg={C.accent}
-                  cursor="pointer"
-                  hover:bg={C.accentDim}
-                >
-                  button text
-                </button>
-              </view>
-            </view>
-
-            <view
-              display="flex"
-              flexDir="col"
-              gap={8}
-              flex={1}
-              minW={200}
-              p={16}
-              bg={C.surface2}
-              rounded={12}
-              border={1}
-              borderColor={C.border}
-            >
-              <view display="flex" flexDir="col" gap={4}>
-                <text fontSize={13} fontWeight={600} color={C.accentHi}>
-                  Flex Centered
-                </text>
-                <text fontSize={12} color={C.textMuted}>
-                  flex-centered | px: 12 | py: 6 | rounded: 8
-                </text>
-              </view>
-              <view
-                display="flex"
-                items="center"
-                justify="center"
-                p={12}
-                bg={C.surface}
-                rounded={8}
-              >
-                <button
+                <view display="flex" flexDir="col" gap={2}>
+                  <text fontSize={13} fontWeight={600} color={C.accentHi}>
+                    Default
+                  </text>
+                  <text fontSize={11} color={C.textMuted}>
+                    No properties set
+                  </text>
+                </view>
+                <view
                   display="flex"
-                  flexDir="row"
+                  items="center"
                   justify="center"
-                  w={120}
+                  p={8}
+                  bg={C.surface}
                   rounded={8}
-                  px={12}
-                  py={6}
-                  bg={C.accent}
-                  cursor="pointer"
-                  hover:bg={C.accentDim}
                 >
-                  button text
-                </button>
+                  <button
+                    w={120}
+                    bg={C.accent}
+                    cursor="pointer"
+                    hover:bg={C.accentDim}
+                  >
+                    button text
+                  </button>
+                </view>
               </view>
+
+              <view
+                display="flex"
+                flexDir="col"
+                gap={8}
+                flex={1}
+                p={12}
+                bg={C.surface2}
+                rounded={12}
+                border={1}
+                borderColor={C.border}
+              >
+                <view display="flex" flexDir="col" gap={2}>
+                  <text fontSize={13} fontWeight={600} color={C.accentHi}>
+                    With Padding
+                  </text>
+                  <text fontSize={11} color={C.textMuted}>
+                    px: 12 | py: 6
+                  </text>
+                </view>
+                <view
+                  display="flex"
+                  items="center"
+                  justify="center"
+                  p={8}
+                  bg={C.surface}
+                  rounded={8}
+                >
+                  <button
+                    w={120}
+                    px={12}
+                    py={6}
+                    bg={C.accent}
+                    cursor="pointer"
+                    hover:bg={C.accentDim}
+                  >
+                    button text
+                  </button>
+                </view>
+              </view>
+
+              <view
+                display="flex"
+                flexDir="col"
+                gap={8}
+                flex={1}
+                p={12}
+                bg={C.surface2}
+                rounded={12}
+                border={1}
+                borderColor={C.border}
+              >
+                <view display="flex" flexDir="col" gap={2}>
+                  <text fontSize={13} fontWeight={600} color={C.accentHi}>
+                    Uniform Padding
+                  </text>
+                  <text fontSize={11} color={C.textMuted}>
+                    padding: 12
+                  </text>
+                </view>
+                <view
+                  display="flex"
+                  items="center"
+                  justify="center"
+                  p={8}
+                  bg={C.surface}
+                  rounded={8}
+                >
+                  <button
+                    w={120}
+                    p={12}
+                    bg={C.accent}
+                    cursor="pointer"
+                    hover:bg={C.accentDim}
+                  >
+                    button text
+                  </button>
+                </view>
+              </view>
+            </view>
+
+            <view display="flex" flexDir="row" gap={12}>
+              <view
+                display="flex"
+                flexDir="col"
+                gap={8}
+                flex={1}
+                p={12}
+                bg={C.surface2}
+                rounded={12}
+                border={1}
+                borderColor={C.border}
+              >
+                <view display="flex" flexDir="col" gap={2}>
+                  <text fontSize={13} fontWeight={600} color={C.accentHi}>
+                    Rounded
+                  </text>
+                  <text fontSize={11} color={C.textMuted}>
+                    rounded: 8 | px: 12 | py: 6
+                  </text>
+                </view>
+                <view
+                  display="flex"
+                  items="center"
+                  justify="center"
+                  p={8}
+                  bg={C.surface}
+                  rounded={8}
+                >
+                  <button
+                    w={120}
+                    rounded={8}
+                    px={12}
+                    py={6}
+                    bg={C.accent}
+                    cursor="pointer"
+                    hover:bg={C.accentDim}
+                  >
+                    button text
+                  </button>
+                </view>
+              </view>
+
+              <view
+                display="flex"
+                flexDir="col"
+                gap={8}
+                flex={1}
+                p={12}
+                bg={C.surface2}
+                rounded={12}
+                border={1}
+                borderColor={C.border}
+              >
+                <view display="flex" flexDir="col" gap={2}>
+                  <text fontSize={13} fontWeight={600} color={C.accentHi}>
+                    Flex Centered
+                  </text>
+                  <text fontSize={11} color={C.textMuted}>
+                    flex | px: 12 | py: 6 | rounded: 8
+                  </text>
+                </view>
+                <view
+                  display="flex"
+                  items="center"
+                  justify="center"
+                  p={8}
+                  bg={C.surface}
+                  rounded={8}
+                >
+                  <button
+                    display="flex"
+                    flexDir="row"
+                    justify="center"
+                    w={120}
+                    rounded={8}
+                    px={12}
+                    py={6}
+                    bg={C.accent}
+                    cursor="pointer"
+                    hover:bg={C.accentDim}
+                  >
+                    button text
+                  </button>
+                </view>
+              </view>
+
+              <view flex={1} />
             </view>
           </view>
         </view>
