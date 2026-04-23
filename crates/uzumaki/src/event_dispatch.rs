@@ -174,24 +174,23 @@ fn sync_focused_input_cursor(
 fn set_ime_cursor_area(
     handle: &mut Window,
     meta: &FocusedInputLayoutMeta,
-    cursor_rect: &parley::BoundingBox,
+    ime_area: &parley::BoundingBox,
     _scroll_offset_x: f32,
     scroll_offset_y: f32,
 ) {
     let line_height = (meta.text_style.font_size * meta.text_style.line_height).round() as f64;
+    let text_origin_x = meta.taffy_x + meta.input_padding as f64;
     let text_origin_y = if meta.multiline {
         meta.taffy_y + meta.top_pad as f64 - scroll_offset_y as f64
     } else {
         meta.taffy_y + ((meta.input_height as f64 - line_height) / 2.0).max(0.0)
     };
-    let caret_x = meta.taffy_x + meta.input_padding as f64 + cursor_rect.x0;
-    let line_left_x = meta.taffy_x + meta.input_padding as f64;
-    let line_top_y = text_origin_y + cursor_rect.y0;
-    let line_right_x = meta.taffy_x + meta.input_padding as f64 + meta.input_width as f64;
-    let area_x = (caret_x - 4.0).max(line_left_x);
-    let area_width = (line_right_x - area_x).clamp(24.0, meta.input_width as f64);
-    let position = winit::dpi::LogicalPosition::new(area_x, line_top_y);
-    let size = winit::dpi::LogicalSize::new(area_width as f32, line_height.max(1.0) as f32);
+    let position =
+        winit::dpi::LogicalPosition::new(text_origin_x + ime_area.x0, text_origin_y + ime_area.y0);
+    let size = winit::dpi::LogicalSize::new(
+        (ime_area.x1 - ime_area.x0).max(24.0) as f32,
+        (ime_area.y1 - ime_area.y0).max(1.0) as f32,
+    );
     handle.winit_window.set_ime_cursor_area(position, size);
 }
 
@@ -202,18 +201,19 @@ pub fn update_ime_cursor_area(dom: &mut UIState, handle: &mut Window) {
     let Some(meta) = input_layout_meta(dom, focused_id) else {
         return;
     };
-    let Some((cursor_rect, scroll_offset_x, scroll_offset_y)) =
+    let Some((_cursor_rect, scroll_offset_x, scroll_offset_y)) =
         sync_focused_input_cursor(dom, handle, focused_id, &meta)
     else {
         return;
     };
-    set_ime_cursor_area(
-        handle,
-        &meta,
-        &cursor_rect,
-        scroll_offset_x,
-        scroll_offset_y,
-    );
+    let Some(node) = dom.nodes.get(focused_id) else {
+        return;
+    };
+    let Some(is) = node.as_text_input() else {
+        return;
+    };
+    let ime_area = is.editor.ime_cursor_area();
+    set_ime_cursor_area(handle, &meta, &ime_area, scroll_offset_x, scroll_offset_y);
 }
 
 /// Scroll the focused input so the cursor stays visible.
@@ -258,16 +258,15 @@ pub fn scroll_input_to_cursor(dom: &mut UIState, handle: &mut Window) {
         }
     }
 
-    if let Some((cursor_rect, scroll_offset_x, scroll_offset_y)) =
+    if let Some((_cursor_rect, scroll_offset_x, scroll_offset_y)) =
         sync_focused_input_cursor(dom, handle, focused_id, &meta)
     {
-        set_ime_cursor_area(
-            handle,
-            &meta,
-            &cursor_rect,
-            scroll_offset_x,
-            scroll_offset_y,
-        );
+        if let Some(node) = dom.nodes.get(focused_id)
+            && let Some(is) = node.as_text_input()
+        {
+            let ime_area = is.editor.ime_cursor_area();
+            set_ime_cursor_area(handle, &meta, &ime_area, scroll_offset_x, scroll_offset_y);
+        }
     }
 }
 
