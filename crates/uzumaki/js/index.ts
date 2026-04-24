@@ -1,9 +1,31 @@
 import { eventManager, EventType } from './events';
+import {
+  MediaBackends,
+  MediaCodecs,
+  MediaPlayer,
+  configureMediaNapi,
+} from './media';
+import { Plugins } from './plugins';
 import { disposeWindow, Window } from './window';
 
 export { Window } from './window';
 export { Clipboard } from './clipboard';
+export { MediaPlayer, MediaCodecs, MediaBackends, configureMediaNapi } from './media';
+export { Plugins } from './plugins';
 export { eventManager, EventType } from './events';
+export type {
+  MediaLoadOptions,
+  MediaPlayerOptions,
+  MediaSnapshot,
+  CodecSupport,
+  VideoFramePacket,
+  AudioPacket,
+} from './media';
+export type {
+  PluginCapability,
+  PluginManifest,
+  PluginPolicyInfo,
+} from './plugins';
 export type {
   EventPhase,
   EventName,

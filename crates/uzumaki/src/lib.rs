@@ -10,6 +10,7 @@ pub mod gpu;
 pub mod input;
 pub mod interactivity;
 pub mod ops;
+pub mod plugin;
 pub mod selection;
 pub mod style;
 pub mod text;
@@ -81,6 +82,11 @@ extension!(
     op_get_selected_text,
     op_read_clipboard_text,
     op_write_clipboard_text,
+    op_list_plugins,
+    op_has_plugin_capability,
+    op_get_plugin_policy,
+    op_list_denied_plugin_capabilities,
+    op_require_plugin_capability,
   ],
   esm_entry_point = "ext:uzumaki/runtime.js",
   esm = [ dir "core", "runtime.js" ],

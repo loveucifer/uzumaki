@@ -10,5 +10,9 @@
     "entry": "index.js",
     "output": "./{{PROJECT_NAME}}",
     "name": "{{PROJECT_NAME}}"
+  },
+  "plugins": {
+    "allow": [],
+    "deny": []
   }
 }

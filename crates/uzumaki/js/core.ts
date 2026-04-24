@@ -78,6 +78,35 @@ interface Core {
   getSelectedText(windowId: number): string;
   readClipboardText(): string | null;
   writeClipboardText(text: string): boolean;
+  listPlugins(): PluginManifest[];
+  hasPluginCapability(capability: PluginCapability): boolean;
+  getPluginPolicy(): PluginPolicyInfo;
+  listDeniedPluginCapabilities(): PluginCapability[];
+  requirePluginCapability(capability: PluginCapability): void;
+}
+
+export type PluginCapability =
+  | 'camera'
+  | 'bluetooth'
+  | 'filesystemWatch'
+  | 'mediaDecode'
+  | 'mediaPlayback'
+  | 'notifications'
+  | 'tray'
+  | 'nativeMenu'
+  | 'webview'
+  | 'gpuSharedTextures';
+
+export interface PluginManifest {
+  name: string;
+  version: string;
+  capabilities: PluginCapability[];
+}
+
+export interface PluginPolicyInfo {
+  source: string;
+  allow: PluginCapability[];
+  deny: PluginCapability[];
 }
 
 export interface SelectionState {

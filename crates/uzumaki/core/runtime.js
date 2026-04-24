@@ -31,6 +31,11 @@ import {
   op_get_ancestor_path,
   op_read_clipboard_text,
   op_write_clipboard_text,
+  op_list_plugins,
+  op_has_plugin_capability,
+  op_get_plugin_policy,
+  op_list_denied_plugin_capabilities,
+  op_require_plugin_capability,
 } from 'ext:core/ops';
 
 Object.defineProperty(globalThis, '__uzumaki_ops_dont_touch_this__', {
@@ -67,6 +72,11 @@ Object.defineProperty(globalThis, '__uzumaki_ops_dont_touch_this__', {
     getAncestorPath: op_get_ancestor_path,
     readClipboardText: op_read_clipboard_text,
     writeClipboardText: op_write_clipboard_text,
+    listPlugins: op_list_plugins,
+    hasPluginCapability: op_has_plugin_capability,
+    getPluginPolicy: op_get_plugin_policy,
+    listDeniedPluginCapabilities: op_list_denied_plugin_capabilities,
+    requirePluginCapability: op_require_plugin_capability,
   }),
   writable: false,
   configurable: false,

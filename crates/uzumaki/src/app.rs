@@ -29,6 +29,9 @@ use crate::clipboard;
 use crate::cursor;
 use crate::event_dispatch;
 use crate::gpu::GpuContext;
+use crate::plugin::{
+    PluginLifecycleContext, PluginPermissionPolicy, PluginRegistry, register_builtin_plugins,
+};
 use crate::runtime::module_loader::{UzCjsCodeAnalyzer, UzRequireLoader};
 use crate::runtime::resolver::UzCjsTracker;
 use crate::runtime::sys::UzSys;
@@ -50,6 +53,7 @@ pub struct AppState {
     pub mouse_buttons: u8, // todo move to UIState ?
     pub modifiers: u32,    // same
     pub clipboard: RefCell<clipboard::SystemClipboard>,
+    pub plugins: PluginRegistry,
     pub gpu: GpuContext,
 }
 
@@ -277,6 +281,10 @@ impl Application {
         let system_clipboard =
             clipboard::SystemClipboard::new().expect("failed to initialize system clipboard");
 
+        let plugin_policy = PluginPermissionPolicy::from_app_root(&app_root);
+        let mut plugin_registry = PluginRegistry::new(plugin_policy);
+        register_builtin_plugins(&mut plugin_registry);
+
         let app_state = Rc::new(RefCell::new(AppState {
             gpu,
             windows: HashMap::new(),
@@ -284,7 +292,17 @@ impl Application {
             mouse_buttons: 0,
             modifiers: 0,
             clipboard: RefCell::new(system_clipboard),
+            plugins: plugin_registry,
         }));
+
+        {
+            let mut state = app_state.borrow_mut();
+            // Start hooks run once and allow plugins to acquire long-lived resources.
+            state.plugins.on_runtime_start(&PluginLifecycleContext {
+                app_root: app_root.clone(),
+                entrypoint: main_file.clone(),
+            });
+        }
 
         // Put shared state and event loop proxy into OpState
         {
@@ -572,6 +590,7 @@ impl ApplicationHandler<UserEvent> for Application {
             }
             UserEvent::Quit => {
                 let mut state = self.app_state.borrow_mut();
+                state.plugins.on_runtime_stop();
                 state.windows.clear();
                 state.winit_id_to_entry_id.clear();
                 drop(state);
@@ -985,6 +1004,7 @@ impl ApplicationHandler<UserEvent> for Application {
                 state.winit_id_to_entry_id.remove(&window_id);
                 state.windows.remove(&wid);
                 if state.windows.is_empty() {
+                    state.plugins.on_runtime_stop();
                     event_loop.exit();
                     return;
                 }

@@ -96,6 +96,82 @@ bun install
 bun dev
 ```
 
+## Plugin Capabilities
+
+Uzumaki can gate native extension features (for example bluetooth, camera, and
+media decode) through `uzumaki.config.json`.
+
+```json
+{
+  "plugins": {
+    "allow": ["bluetooth", "mediaDecode", "mediaPlayback"],
+    "deny": ["camera"]
+  }
+}
+```
+
+In app code, use capability checks before enabling feature paths:
+
+```ts
+import { Plugins } from 'uzumaki-ui';
+
+if (Plugins.has('bluetooth')) {
+  // Enable bluetooth feature flow.
+}
+
+// Throw a clear runtime error if a capability is required.
+Plugins.require('mediaPlayback');
+```
+
+## Experimental N-API Media Module
+
+The repository now includes a native N-API media addon in
+`crates/media_napi` (crate name: `uzumaki_media_napi`).
+
+Current status:
+
+- Provides a `MediaPlayer` class API surface (`load`, `play`, `pause`, `stop`, `seek`, `setVolume`, `setMuted`, `snapshot`, `tick`)
+- Exposes codec support helpers (`getCodecSupport`, `supportsVideoCodec`, `supportsAudioCodec`)
+- Uses FFmpeg as the decoder backend when built with the `ffmpeg-backend` feature
+
+From `uzumaki-ui`, wire the addon into the JS layer with `configureMediaNapi`:
+
+```ts
+import {
+  MediaBackends,
+  MediaPlayer,
+  MediaCodecs,
+  Plugins,
+  configureMediaNapi,
+} from 'uzumaki-ui';
+import mediaNapi from './path-to-loaded-media-addon';
+
+configureMediaNapi(mediaNapi);
+
+Plugins.require('mediaPlayback');
+Plugins.require('mediaDecode');
+
+console.log(MediaBackends.available());
+console.log(MediaCodecs.support());
+
+const player = new MediaPlayer({ backend: 'ffmpeg' });
+player.load({ source: './movie.mp4', enableAudio: true, enableVideo: true });
+player.play();
+
+// Framework pipeline contracts: decoded packets are exposed here.
+player.tick(16);
+const frame = player.readVideoFrame();
+const audio = player.readAudioPacket();
+```
+
+The framework now has backend/pipeline contracts for decoder integration:
+
+- Backend selection (`ffmpeg` when compiled with `ffmpeg-backend`)
+- Unified frame packet pull API (`readVideoFrame`)
+- Unified audio packet pull API (`readAudioPacket`)
+
+To enable decoding, compile the media addon with the `ffmpeg-backend` feature.
+
 ## Links
 
 - [Docs](https://uzumaki.run)

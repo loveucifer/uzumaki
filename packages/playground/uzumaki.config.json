@@ -10,5 +10,9 @@
     "entry": "index.js",
     "output": "./playground",
     "name": "playground"
+  },
+  "plugins": {
+    "allow": [],
+    "deny": []
   }
 }
