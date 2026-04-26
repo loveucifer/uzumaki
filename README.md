@@ -75,7 +75,7 @@ render(window, <App />);
 
 ## Install
 
-**macOS**
+**macOS / Linux**
 
 ```sh
 curl -fsSL https://uzumaki.run/install.sh | sh

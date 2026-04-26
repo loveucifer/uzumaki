@@ -1,6 +1,6 @@
 #!/bin/sh
 # Uzumaki installer — downloads the latest release binary from GitHub.
-# Usage: curl -fsSL https://uzumaki.dev/install.sh | sh
+# Usage: curl -fsSL https://uzumaki.run/install.sh | sh
 
 set -e
 
