@@ -3,8 +3,8 @@ use slab::Slab;
 use crate::{
     cursor::UzCursorIcon,
     element::{
-        ElementData, ElementNode, Node, NodeContext, ScrollDragState, ScrollThumbRect, TextNode,
-        TextRunEntry, TextSelectRun, UzNodeId, render,
+        ElementData, ElementNode, ImageData, ImageMeasureInfo, ImageNode, Node, NodeContext,
+        ScrollDragState, ScrollThumbRect, TextNode, TextRunEntry, TextSelectRun, UzNodeId, render,
     },
     input::InputState,
     interactivity::{HitTestState, HitboxStore},
@@ -152,6 +152,7 @@ impl UIState {
                     text: None,
                     text_style: TextStyle::default(),
                     is_input: false,
+                    image: None,
                 }),
             )
             .unwrap();
@@ -178,6 +179,7 @@ impl UIState {
                     text: Some(text),
                     text_style,
                     is_input: false,
+                    image: None,
                 }),
             )
             .unwrap();
@@ -205,11 +207,36 @@ impl UIState {
                     text: None,
                     text_style,
                     is_input: true,
+                    image: None,
                 }),
             )
             .unwrap();
         // Input always needs a hitbox for click-to-focus
         self.nodes[node_id].interactivity.js_interactive = true;
+        node_id
+    }
+
+    pub fn create_image(&mut self, style: UzStyle) -> UzNodeId {
+        let taffy_style = style.to_taffy();
+        let taffy_node = self.taffy.new_leaf(taffy_style).unwrap();
+        let node_id = self.nodes.insert(Node::new(
+            taffy_node,
+            style,
+            ElementNode::new_image(ImageNode::default()),
+        ));
+
+        self.taffy
+            .set_node_context(
+                taffy_node,
+                Some(NodeContext {
+                    dom_id: node_id,
+                    text: None,
+                    text_style: TextStyle::default(),
+                    is_input: false,
+                    image: None,
+                }),
+            )
+            .unwrap();
         node_id
     }
 
@@ -237,6 +264,7 @@ impl UIState {
                     text: None,
                     text_style: TextStyle::default(),
                     is_input: false,
+                    image: None,
                 }),
             )
             .unwrap();
@@ -419,9 +447,46 @@ impl UIState {
                     text: Some(tc),
                     text_style,
                     is_input: false,
+                    image: None,
                 }),
             )
             .unwrap();
+    }
+
+    pub fn set_image_data(&mut self, node_id: UzNodeId, data: ImageData) {
+        let Some(node) = self.nodes.get_mut(node_id) else {
+            return;
+        };
+        let Some(image_node) = node.as_image_mut() else {
+            return;
+        };
+        let measure = data.natural_size().map(|(w, h)| ImageMeasureInfo {
+            width: w,
+            height: h,
+        });
+        image_node.data = data;
+
+        let taffy_node = node.taffy_node;
+        if let Some(ctx) = self.taffy.get_node_context_mut(taffy_node) {
+            ctx.image = measure;
+        }
+        let _ = self.taffy.mark_dirty(taffy_node);
+    }
+
+    pub fn clear_image_data(&mut self, node_id: UzNodeId) {
+        let Some(node) = self.nodes.get_mut(node_id) else {
+            return;
+        };
+        let Some(image_node) = node.as_image_mut() else {
+            return;
+        };
+        image_node.clear();
+
+        let taffy_node = node.taffy_node;
+        if let Some(ctx) = self.taffy.get_node_context_mut(taffy_node) {
+            ctx.image = None;
+        }
+        let _ = self.taffy.mark_dirty(taffy_node);
     }
 
     /// Remove all children (and their descendants) from `parent_id`, clearing

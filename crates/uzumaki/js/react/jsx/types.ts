@@ -167,5 +167,14 @@ export namespace JSX {
         children?: any;
         key?: string | number;
       };
+    image: ElementAttributes &
+      EventProps & {
+        src: string;
+        onLoad?: (ev: { src: string }) => void;
+        onLoadStart?: (ev: { src: string }) => void;
+        onError?: (ev: { src: string; message: string }) => void;
+        children?: any;
+        key?: string | number;
+      };
   }
 }

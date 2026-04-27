@@ -11,6 +11,14 @@ interface Core {
   getRootNodeId(windowId: number): NodeId;
   createElement(windowId: number, elementType: string): NodeId;
   createTextNode(windowId: number, text: string): NodeId;
+  setEncodedImageData(
+    windowId: number,
+    nodeId: NodeId,
+    cacheKey: string,
+    data: Uint8Array,
+  ): void;
+  applyCachedImage(windowId: number, nodeId: NodeId, cacheKey: string): boolean;
+  clearImageData(windowId: number, nodeId: NodeId): void;
   appendChild(windowId: number, parentId: NodeId, childId: NodeId): void;
   insertBefore(
     windowId: number,
@@ -51,6 +59,7 @@ interface Core {
   getSelectedText(windowId: number): string;
   readClipboardText(): string | null;
   writeClipboardText(text: string): boolean;
+  decodeImageSource(source: string): Promise<Uint8Array>;
 }
 
 export interface SelectionState {
@@ -76,3 +85,26 @@ const core: Core = (globalThis as unknown as any)
   .__uzumaki_ops_dont_touch_this__;
 
 export default core;
+
+export function setNativeProp(
+  windowId: number,
+  nodeId: any,
+  propName: string,
+  value: any,
+): void {
+  if (typeof value === 'boolean') {
+    core.setBoolAttribute(windowId, nodeId, propName, value);
+  } else if (typeof value === 'number') {
+    core.setNumberAttribute(windowId, nodeId, propName, value);
+  } else {
+    core.setStrAttribute(windowId, nodeId, propName, String(value));
+  }
+}
+
+export function clearNativeProp(
+  windowId: number,
+  nodeId: any,
+  propName: string,
+): void {
+  core.clearAttribute(windowId, nodeId, propName);
+}

@@ -2,11 +2,15 @@ use crate::cursor::UzCursorIcon;
 use crate::input::InputState;
 use crate::interactivity::Interactivity;
 use crate::style::{Bounds, TextSelectable, TextStyle, UzStyle};
+use std::sync::Arc;
+use vello::peniko::Blob;
 
 pub mod checkbox;
+pub mod image;
 pub mod input;
 pub mod render;
 pub mod selection;
+pub mod svg;
 pub mod text;
 pub mod view;
 
@@ -63,6 +67,77 @@ impl TextNode {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ImageMeasureInfo {
+    pub width: f32,
+    pub height: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RasterImageData {
+    pub width: u32,
+    pub height: u32,
+    pub data: Blob<u8>,
+}
+
+impl RasterImageData {
+    pub fn new(width: u32, height: u32, data: Arc<Vec<u8>>) -> Self {
+        Self {
+            width,
+            height,
+            data: Blob::new(data),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub enum ImageData {
+    Raster(RasterImageData),
+    Svg(Arc<usvg::Tree>),
+    #[default]
+    None,
+}
+
+impl ImageData {
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+
+    pub fn natural_size(&self) -> Option<(f32, f32)> {
+        match self {
+            Self::Raster(r) => Some((r.width as f32, r.height as f32)),
+            Self::Svg(tree) => {
+                let s = tree.size();
+                Some((s.width(), s.height()))
+            }
+            Self::None => None,
+        }
+    }
+}
+
+impl From<RasterImageData> for ImageData {
+    fn from(value: RasterImageData) -> Self {
+        Self::Raster(value)
+    }
+}
+
+impl From<usvg::Tree> for ImageData {
+    fn from(value: usvg::Tree) -> Self {
+        Self::Svg(Arc::new(value))
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ImageNode {
+    pub data: ImageData,
+}
+
+impl ImageNode {
+    pub fn clear(&mut self) {
+        self.data = ImageData::None;
+    }
+}
+
 // General-purpose mechanism for properties that propagate from parent to child
 // unless explicitly overridden. Designed for extension — future inheritable
 // properties (font color, font size, line height, etc.) go here.
@@ -95,6 +170,7 @@ pub struct NodeContext {
     pub text: Option<TextNode>,
     pub text_style: TextStyle,
     pub is_input: bool,
+    pub image: Option<ImageMeasureInfo>,
 }
 
 pub struct ElementNode {
@@ -118,12 +194,20 @@ impl ElementNode {
         Self::new(ElementData::CheckboxInput(checked))
     }
 
+    pub fn new_image(state: ImageNode) -> Self {
+        Self::new(ElementData::Image(Box::new(state)))
+    }
+
     pub fn is_text_input(&self) -> bool {
         self.data.is_text_input()
     }
 
     pub fn is_checkbox_input(&self) -> bool {
         self.data.is_checkbox_input()
+    }
+
+    pub fn is_image(&self) -> bool {
+        self.data.is_image()
     }
 
     pub fn is_focussable(&self) -> bool {
@@ -140,6 +224,7 @@ pub enum ElementData {
     // this is text Element <text>
     TextInput(Box<InputState>),
     CheckboxInput(bool),
+    Image(Box<ImageNode>),
     // for view nodes
     #[default]
     None,
@@ -160,6 +245,10 @@ impl ElementData {
 
     pub fn is_checkbox_input(&self) -> bool {
         matches!(self, Self::CheckboxInput(_))
+    }
+
+    pub fn is_image(&self) -> bool {
+        matches!(self, Self::Image(_))
     }
 
     pub fn as_text_input(&self) -> Option<&InputState> {
@@ -186,6 +275,20 @@ impl ElementData {
     pub fn as_checkbox_input_mut(&mut self) -> Option<&mut bool> {
         match self {
             Self::CheckboxInput(checked) => Some(checked),
+            _ => None,
+        }
+    }
+
+    pub fn as_image(&self) -> Option<&ImageNode> {
+        match self {
+            Self::Image(image) => Some(image),
+            _ => None,
+        }
+    }
+
+    pub fn as_image_mut(&mut self) -> Option<&mut ImageNode> {
+        match self {
+            Self::Image(image) => Some(image),
             _ => None,
         }
     }
@@ -276,6 +379,20 @@ impl NodeData {
         }
     }
 
+    pub fn as_image(&self) -> Option<&ImageNode> {
+        match self {
+            Self::Element(element) => element.data.as_image(),
+            _ => None,
+        }
+    }
+
+    pub fn as_image_mut(&mut self) -> Option<&mut ImageNode> {
+        match self {
+            Self::Element(element) => element.data.as_image_mut(),
+            _ => None,
+        }
+    }
+
     pub fn is_text_node(&self) -> bool {
         matches!(self, Self::Text(_))
     }
@@ -290,6 +407,13 @@ impl NodeData {
     pub fn is_checkbox_input(&self) -> bool {
         match self {
             Self::Element(element) => element.data.is_checkbox_input(),
+            _ => false,
+        }
+    }
+
+    pub fn is_image(&self) -> bool {
+        match self {
+            Self::Element(element) => element.data.is_image(),
             _ => false,
         }
     }
@@ -420,12 +544,24 @@ impl Node {
         self.data.as_text_node_mut()
     }
 
+    pub fn as_image(&self) -> Option<&ImageNode> {
+        self.data.as_image()
+    }
+
+    pub fn as_image_mut(&mut self) -> Option<&mut ImageNode> {
+        self.data.as_image_mut()
+    }
+
     pub fn is_text_input(&self) -> bool {
         self.data.is_text_input()
     }
 
     pub fn is_checkbox_input(&self) -> bool {
         self.data.is_checkbox_input()
+    }
+
+    pub fn is_image(&self) -> bool {
+        self.data.is_image()
     }
 
     pub fn is_text_node(&self) -> bool {

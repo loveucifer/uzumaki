@@ -5,6 +5,11 @@ import {
   op_get_root_node_id,
   op_create_element,
   op_create_text_node,
+  /** begin image */
+  op_set_encoded_image_data,
+  op_apply_cached_image,
+  op_clear_image_data,
+  /** end image */
   op_append_child,
   op_insert_before,
   op_remove_child,
@@ -33,6 +38,9 @@ Object.defineProperty(globalThis, '__uzumaki_ops_dont_touch_this__', {
     getRootNodeId: op_get_root_node_id,
     createElement: op_create_element,
     createTextNode: op_create_text_node,
+    setEncodedImageData: op_set_encoded_image_data,
+    applyCachedImage: op_apply_cached_image,
+    clearImageData: op_clear_image_data,
     appendChild: op_append_child,
     insertBefore: op_insert_before,
     removeChild: op_remove_child,

@@ -25,7 +25,7 @@ export function IssuesPage() {
         return res.json();
       })
       .then((data) => {
-        setIssues(data);
+        setIssues(data as GitHubIssue[]);
         setLoading(false);
       })
       .catch((error) => {
