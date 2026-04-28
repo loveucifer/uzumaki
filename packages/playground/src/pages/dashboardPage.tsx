@@ -71,7 +71,12 @@ export function DashboardPage() {
           </text>
           <view display="flex" flexDir="row" items="center" gap={8}>
             <view px={8} py={2} bg={C.accentDim} rounded={4}>
-              <text fontSize={10} fontWeight={700} color={C.accentHi}>
+              <text
+                textWrap="nowrap"
+                fontSize={10}
+                fontWeight={700}
+                color={C.accentHi}
+              >
                 DEMO MODE
               </text>
             </view>
@@ -94,7 +99,12 @@ export function DashboardPage() {
             <text fontSize={14} color={C.success} opacity={blink ? 1 : 0.3}>
               {spinChar}
             </text>
-            <text fontSize={12} fontWeight={600} color={C.successHi}>
+            <text
+              fontSize={12}
+              textWrap="nowrap"
+              fontWeight={600}
+              color={C.successHi}
+            >
               LIVE
             </text>
           </view>
