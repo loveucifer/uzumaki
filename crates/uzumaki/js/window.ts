@@ -20,6 +20,7 @@ export interface WindowAttributes {
   height: number;
   title: string;
   rootStyles: Record<string, unknown>;
+  vars?: Record<string, unknown>;
 }
 
 export class Window {
@@ -41,6 +42,7 @@ export class Window {
       height = 600,
       title = 'uzumaki',
       rootStyles,
+      vars,
     }: Partial<WindowAttributes> = {},
   ) {
     const existing = windowsByLabel.get(label);
@@ -52,7 +54,10 @@ export class Window {
     this._height = height;
     this._label = label;
     this._title = title;
-    this._native = core.createWindow({ width, height, title });
+    this._native =
+      vars == null
+        ? core.createWindow({ width, height, title })
+        : core.createWindow({ width, height, title, vars });
     this._id = this._native.id;
     if (rootStyles) {
       const root = this.root;
@@ -62,6 +67,10 @@ export class Window {
     }
     windowsByLabel.set(label, this);
     windowsById.set(this._id, this);
+  }
+
+  setVars(vars: Record<string, unknown>): void {
+    core.setWindowVars(this._id, vars);
   }
 
   close() {
@@ -190,4 +199,12 @@ export function disposeWindow(_window: Window) {
   eventManager.clearWindowHandlers(window.id);
   windowsByLabel.delete(window.label);
   windowsById.delete(window.id);
+}
+
+export function getWindow(label: string): Window {
+  const window = windowsByLabel.get(label);
+  if (!window) {
+    throw new Error(`Window with label ${label} not found`);
+  }
+  return window;
 }

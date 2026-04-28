@@ -22,6 +22,7 @@ use deno_runtime::deno_web::{BlobStore, InMemoryBroadcastChannel};
 use deno_runtime::worker::{MainWorker, WorkerOptions, WorkerServiceOptions};
 use node_resolver::analyze::{CjsModuleExportAnalyzer, NodeCodeTranslator, NodeCodeTranslatorMode};
 use node_resolver::cache::NodeResolutionSys;
+use serde_json::Value;
 use winit::window::WindowId;
 use winit::{application::ApplicationHandler, event::WindowEvent};
 
@@ -40,6 +41,8 @@ pub struct WindowEntry {
     pub handle: Option<window::Window>,
     pub rem_base: f32,
     pub cursor_blink_generation: u64,
+    pub vars: HashMap<String, Value>,
+    pub bound_vars: HashMap<(crate::element::UzNodeId, String), String>,
 }
 
 impl WindowEntry {

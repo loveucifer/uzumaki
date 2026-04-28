@@ -1,5 +1,6 @@
 import {
   op_create_window,
+  op_set_window_vars,
   op_request_quit,
   op_request_redraw,
   op_get_root_node,
@@ -21,6 +22,7 @@ import {
 Object.defineProperty(globalThis, '__uzumaki_ops_dont_touch_this__', {
   value: Object.freeze({
     createWindow: op_create_window,
+    setWindowVars: op_set_window_vars,
     requestQuit: op_request_quit,
     requestRedraw: op_request_redraw,
     getRootNode: op_get_root_node,

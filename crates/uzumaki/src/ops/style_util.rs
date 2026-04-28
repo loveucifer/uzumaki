@@ -10,6 +10,15 @@ use crate::ui::UIState;
 use crate::parse::*;
 
 impl WindowEntry {
+    pub fn remove_bound_vars_for_nodes(&mut self, node_ids: &[UzNodeId]) {
+        if node_ids.is_empty() {
+            return;
+        }
+        let ids: std::collections::HashSet<UzNodeId> = node_ids.iter().copied().collect();
+        self.bound_vars
+            .retain(|(node_id, _), _| !ids.contains(node_id));
+    }
+
     pub fn set_str_attribute(&mut self, node_id: UzNodeId, name: &str, value: &str) {
         let Some(kind) = name.parse::<AttributeKind>().ok() else {
             return;
@@ -17,16 +26,31 @@ impl WindowEntry {
 
         let effect = match kind {
             AttributeKind::Element(ep) => {
+                self.bound_vars.remove(&(node_id, name.to_string()));
                 let Some(node) = self.dom.nodes.get_mut(node_id) else {
                     return;
                 };
                 set_element_str(node, ep, value, self.rem_base)
             }
             AttributeKind::Style(prop, variant) => {
+                let Some(var_name) = parse_var_reference(value) else {
+                    self.bound_vars.remove(&(node_id, name.to_string()));
+                    let Some(node) = self.dom.nodes.get_mut(node_id) else {
+                        return;
+                    };
+                    let effect = set_style_str(node, prop, variant, value, self.rem_base);
+                    self.apply_side_effects(node_id, &kind, effect);
+                    return;
+                };
+
+                self.bound_vars
+                    .insert((node_id, name.to_string()), var_name.to_string());
+
+                let var_value = self.vars.get(var_name).cloned();
                 let Some(node) = self.dom.nodes.get_mut(node_id) else {
                     return;
                 };
-                set_style_str(node, prop, variant, value, self.rem_base)
+                apply_var_to_style(node, prop, variant, var_value.as_ref(), self.rem_base)
             }
         };
 
@@ -37,6 +61,8 @@ impl WindowEntry {
         let Some(kind) = name.parse::<AttributeKind>().ok() else {
             return;
         };
+
+        self.bound_vars.remove(&(node_id, name.to_string()));
 
         let effect = match kind {
             AttributeKind::Element(ep) => {
@@ -61,6 +87,8 @@ impl WindowEntry {
             return;
         };
 
+        self.bound_vars.remove(&(node_id, name.to_string()));
+
         let effect = match kind {
             AttributeKind::Element(ep) => {
                 let Some(node) = self.dom.nodes.get_mut(node_id) else {
@@ -83,6 +111,8 @@ impl WindowEntry {
         let Some(kind) = name.parse::<AttributeKind>().ok() else {
             return;
         };
+
+        self.bound_vars.remove(&(node_id, name.to_string()));
 
         let effect = match kind {
             AttributeKind::Element(ep) => {
@@ -117,6 +147,48 @@ impl WindowEntry {
         }
     }
 
+    pub fn set_vars(&mut self, vars: std::collections::HashMap<String, Value>) {
+        self.vars = vars;
+        self.reapply_bound_vars();
+        if let Some(handle) = self.handle.as_ref() {
+            handle.winit_window.request_redraw();
+        }
+    }
+
+    fn reapply_bound_vars(&mut self) {
+        let bindings: Vec<(UzNodeId, String, String)> = self
+            .bound_vars
+            .iter()
+            .map(|((node_id, attr_name), var_name)| (*node_id, attr_name.clone(), var_name.clone()))
+            .collect();
+
+        for (node_id, attr_name, var_name) in bindings {
+            if !self.dom.nodes.contains(node_id) {
+                self.bound_vars.remove(&(node_id, attr_name));
+                continue;
+            }
+
+            let Ok(kind) = attr_name.parse::<AttributeKind>() else {
+                self.bound_vars.remove(&(node_id, attr_name));
+                continue;
+            };
+
+            let effect = match kind {
+                AttributeKind::Style(prop, variant) => {
+                    let value = self.vars.get(var_name.as_str()).cloned();
+                    let Some(node) = self.dom.nodes.get_mut(node_id) else {
+                        self.bound_vars.remove(&(node_id, attr_name));
+                        continue;
+                    };
+                    apply_var_to_style(node, prop, variant, value.as_ref(), self.rem_base)
+                }
+                AttributeKind::Element(_) => continue,
+            };
+
+            self.apply_side_effects(node_id, &kind, effect);
+        }
+    }
+
     fn apply_side_effects(&mut self, node_id: UzNodeId, kind: &AttributeKind, effect: StyleEffect) {
         if matches!(effect, StyleEffect::AppliedNeedsSync) {
             sync_taffy(&mut self.dom, node_id);
@@ -133,6 +205,32 @@ impl WindowEntry {
             let icon = self.dom.resolve_cursor(top);
             handle.set_cursor(icon);
         }
+    }
+}
+
+fn parse_var_reference(value: &str) -> Option<&str> {
+    let token = value.strip_prefix('$')?;
+    if token.is_empty() {
+        return None;
+    }
+    Some(token)
+}
+
+fn apply_var_to_style(
+    node: &mut Node,
+    prop: StyleProp,
+    variant: StyleVariant,
+    value: Option<&Value>,
+    rem_base: f32,
+) -> StyleEffect {
+    match value {
+        Some(Value::String(v)) => set_style_str(node, prop, variant, v, rem_base),
+        Some(Value::Number(v)) => v
+            .as_f64()
+            .map(|n| set_style_number(node, prop, variant, n as f32))
+            .unwrap_or_else(|| clear_style_prop(node, prop, variant)),
+        Some(Value::Bool(v)) => set_style_number(node, prop, variant, if *v { 1.0 } else { 0.0 }),
+        Some(_) | None => clear_style_prop(node, prop, variant),
     }
 }
 

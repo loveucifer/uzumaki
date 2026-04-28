@@ -1,5 +1,6 @@
 import { eventManager, EventType } from './events';
 import { disposeWindow, Window } from './window';
+export { defineVars } from './theme';
 
 export { Window } from './window';
 export { UzNode, UzTextNode } from './node';
@@ -7,6 +8,7 @@ export { Element } from './elements/element';
 export { UzElement } from './elements/base';
 export { UzRootElement } from './elements/root';
 export { UzImageElement } from './elements/image';
+export { getWindow } from './window';
 export { Clipboard } from './clipboard';
 export { eventManager, EventType } from './events';
 export type {

@@ -1,4 +1,6 @@
 use deno_core::*;
+use serde_json::Value;
+use std::collections::HashMap;
 use winit::event_loop::EventLoopProxy;
 
 use crate::app::{
@@ -12,6 +14,8 @@ struct CreateWindowOptions {
     width: u32,
     height: u32,
     title: String,
+    #[serde(default)]
+    vars: HashMap<String, Value>,
 }
 
 #[op2]
@@ -36,6 +40,8 @@ pub fn op_create_window(
                 handle: None,
                 rem_base: 16.0,
                 cursor_blink_generation: 0,
+                vars: options.vars,
+                bound_vars: HashMap::new(),
             },
         );
     });
@@ -56,6 +62,20 @@ pub fn op_create_window(
         })?;
 
     Ok(CoreWindow::new(id))
+}
+
+#[op2]
+pub fn op_set_window_vars(
+    state: &mut OpState,
+    #[smi] window_id: u32,
+    #[serde] vars: HashMap<String, Value>,
+) {
+    let app_state = state.borrow::<SharedAppState>().clone();
+    with_state(&app_state, |s| {
+        if let Some(entry) = s.windows.get_mut(&window_id) {
+            entry.set_vars(vars);
+        }
+    });
 }
 
 #[op2(fast)]

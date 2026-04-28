@@ -36,7 +36,9 @@ interface Core {
     width: number;
     height: number;
     title: string;
+    vars?: Record<string, unknown>;
   }): CoreWindow;
+  setWindowVars(windowId: number, vars: Record<string, unknown>): void;
   requestQuit(): void;
   requestRedraw(windowId: number): void;
   getRootNode(windowId: number): CoreNode;

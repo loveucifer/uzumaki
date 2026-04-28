@@ -56,6 +56,7 @@ extension!(
   ops = [
     op_get_uz_runtime_version,
     op_create_window,
+    op_set_window_vars,
     op_request_quit,
     op_request_redraw,
     op_get_root_node,
