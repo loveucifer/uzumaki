@@ -4,7 +4,6 @@ use serde_json::Value;
 use crate::app::{SharedAppState, with_state};
 use crate::element::UzNodeId;
 use crate::style::UzStyle;
-use crate::ui::UIState;
 
 fn window_not_found() -> deno_error::JsErrorBox {
     deno_error::JsErrorBox::new("WindowNotFound", "window not found")
@@ -77,29 +76,6 @@ unsafe impl GarbageCollected for CoreNode {
     fn get_name(&self) -> &'static std::ffi::CStr {
         c"CoreNode"
     }
-}
-
-fn collect_subtree_node_ids(dom: &UIState, root_id: UzNodeId) -> Vec<UzNodeId> {
-    if !dom.nodes.contains(root_id) {
-        return Vec::new();
-    }
-
-    let mut ids = Vec::new();
-    let mut stack = vec![root_id];
-
-    while let Some(nid) = stack.pop() {
-        ids.push(nid);
-        let Some(node) = dom.nodes.get(nid) else {
-            continue;
-        };
-        let mut child = node.first_child;
-        while let Some(cid) = child {
-            stack.push(cid);
-            child = dom.nodes.get(cid).and_then(|n| n.next_sibling);
-        }
-    }
-
-    ids
 }
 
 #[op2]
@@ -454,8 +430,6 @@ fn remove_child(
         let Some(entry) = s.windows.get_mut(&window_id) else {
             return Err(window_not_found());
         };
-        let removed_ids = collect_subtree_node_ids(&entry.dom, cid);
-        entry.remove_bound_vars_for_nodes(&removed_ids);
         entry.dom.remove_child(pid, cid);
         Ok(())
     })
@@ -545,16 +519,6 @@ pub fn op_reset_dom(
             return Err(window_not_found());
         };
         let root = entry.dom.root.expect("no root node");
-        let removed_ids = {
-            let mut ids = Vec::new();
-            let mut child = entry.dom.nodes[root].first_child;
-            while let Some(cid) = child {
-                ids.extend(collect_subtree_node_ids(&entry.dom, cid));
-                child = entry.dom.nodes[cid].next_sibling;
-            }
-            ids
-        };
-        entry.remove_bound_vars_for_nodes(&removed_ids);
         entry.dom.clear_children(root);
         Ok(())
     })
